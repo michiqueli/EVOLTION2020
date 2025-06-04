@@ -40,7 +40,7 @@ const ActivityTable = ({
 
     fetchProjectNames();
   }, []);
-
+  
   return (
     <div className="space-y-4">
       <div className="flex justify-end">

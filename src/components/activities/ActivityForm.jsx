@@ -29,7 +29,7 @@ const ActivityForm = ({
   onCancel,
 }) => {
   const currentBranchInfo = activityBranches.find(b => b.id === selectedBranch);
-
+ 
   return (
     <motion.form
       key={selectedBranch}
@@ -110,9 +110,10 @@ const ActivityForm = ({
         <Button 
           type="submit" 
           className="bg-primary text-primary-foreground hover:bg-primary/90" 
-          disabled={isUploading || filePreviews.some(f => f.status === 'pending' || f.status === 'uploading')}
+          disabled={isUploading}
         >
-          {isUploading || filePreviews.some(f => f.status === 'pending' || f.status === 'uploading') ? (
+          {isUploading 
+          ? (
             <><Loader className="mr-2 h-4 w-4 animate-spin" /> Subiendo...</>
           ) : "Guardar Informe"}
         </Button>
