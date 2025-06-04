@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 2%; /* Negro profundo */
+    --foreground: 0 0% 98%; /* Blanco */
+
+    --card: 0 0% 8%; /* Gris muy oscuro para tarjetas */
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 2%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 45 100% 50%; /* Amarillo brillante (ej. Yellow 500) */
+    --primary-foreground: 0 0% 10%; /* Negro para texto sobre amarillo */
+
+    --secondary: 0 0% 14%; /* Gris oscuro para elementos secundarios */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 60%; /* Gris medio para texto muted */
+
+    --accent: 0 0% 14%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 72.2% 50.6%; 
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
+    --ring: 45 100% 50%; /* Amarillo para focus rings */
+    
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 0 0% 2%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 2%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 45 100% 50%;
+    --primary-foreground: 0 0% 10%;
+
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 60%;
+
+    --accent: 0 0% 14%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 72.2% 50.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
+    --ring: 45 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+  ::selection {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+}
