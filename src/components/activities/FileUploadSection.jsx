@@ -8,15 +8,15 @@ import { cn } from '@/lib/utils';
 
 const FileUploadSection = ({ filePreviews, handleFileChange, removeFile, isUploading, disabled }) => (
   <div className="space-y-2">
-    <Label className="text-foreground flex items-center"><ImageIcon className="mr-2 h-4 w-4 text-primary"/>Agregar Fotos</Label>
+    <Label className="text-foreground flex items-center"><ImageIcon className="mr-2 h-4 w-4 text-primary"/>Agregar Documentacion</Label>
     <div className="flex items-center justify-center w-full">
       <label htmlFor="dropzone-file" className={cn("flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-lg cursor-pointer bg-background hover:bg-secondary/50", {"opacity-50 cursor-not-allowed": isUploading || disabled })}>
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
               <UploadCloud className={cn("w-8 h-8 mb-2 text-muted-foreground", {"animate-pulse": isUploading})} />
               <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click para subir</span> o arrastrar y soltar</p>
-              <p className="text-xs text-muted-foreground">SVG, PNG, JPG (MAX. 5MB por archivo)</p>
+              <p className="text-xs text-muted-foreground">SVG, PNG, JPG, PDF (MAX. 5MB por archivo)</p>
           </div>
-          <Input id="dropzone-file" type="file" className="hidden" multiple onChange={handleFileChange} disabled={isUploading || disabled} accept="image/png, image/jpeg, image/svg+xml" />
+          <Input id="dropzone-file" type="file" className="hidden" multiple onChange={handleFileChange} disabled={isUploading || disabled} accept="image/png, image/jpeg, image/svg+xml, application/pdf" />
       </label>
     </div>
     {filePreviews.length > 0 && (
