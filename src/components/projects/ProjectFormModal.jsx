@@ -23,60 +23,7 @@ const ProjectFormModal = ({
   isEditing,
   canManage,
 }) => {
-  const [selectedFile, setSelectedFile] = useState(null);
-
-  const handleFileChange = async (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-
-    const uploadedDocs = [];
-
-    for (const file of files) {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-
-      try {
-        const { data, error } = await supabase.storage
-          .from("documentacionproyectos")
-          .upload(fileName, file);
-
-        if (error) throw error;
-
-        const {
-          data: { publicUrl },
-        } = supabase.storage
-          .from("documentacionproyectos")
-          .getPublicUrl(fileName);
-
-        uploadedDocs.push({
-          url: publicUrl,
-          name: file.name,
-        });
-      } catch (error) {
-        console.error("Error al subir el archivo:", error);
-      }
-    }
-
-    // Obtener la documentación ya existente
-    let prevDocs = [];
-    try {
-      if (project?.documentacion) {
-        prevDocs = JSON.parse(project.documentacion);
-      }
-    } catch (err) {
-      console.error("Error al parsear documentacion previa:", err);
-    }
-
-    const allDocs = [...prevDocs, ...uploadedDocs];
-
-    onInputChange({
-      target: {
-        name: "documentacion",
-        value: JSON.stringify(allDocs),
-      },
-    });
-  };
-
+  
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (canManage) {

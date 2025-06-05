@@ -1,358 +1,254 @@
+// src/pages/PlanningPage.jsx
 import React, { useState, useCallback, useEffect } from "react";
-import { motion } from "framer-motion";
-import { CalendarDays, Briefcase, UploadCloud } from "lucide-react";
+import { CalendarDays, Briefcase, Users, Car } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { PlanningGrid } from "@/components/planning/planningLogic";
-import { AvailableTasksPanel } from "@/components/planning/AvailableTasksPanel";
-import { AssignVehicleDialog } from "@/components/planning/AssignVehicleDialog";
-import {
-  initialEmployees,
-  daysOfWeek,
-} from "@/components/planning/planningData";
+import { PlanningGrid } from "@/components/planning/PlanningGrid";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { daysOfWeek } from "@/components/planning/planningData"; // Asegúrate de que este archivo exista y exporte daysOfWeek
 import { useNavigate } from "react-router-dom";
-import { useUser, ROLES } from "@/contexts/UserContext";
-import {
-  handleDragStartLogic,
-  handleDropLogic,
-  handleDragEndLogic,
-  handleCellPointerMoveLogic,
-  handleCellPointerLeaveLogic,
-  handleRemoveTaskLogic,
-  handleAssignVehicleClickLogic,
-  handleAssignVehicleConfirmLogic,
-  handleShowTaskDetailsLogic,
-  handleCopyTaskLogic,
-  handleImportExcelLogic,
-} from "@/components/planning/planningHandlers";
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from "@/lib/supabaseClient"; // Asegúrate de que supabaseClient esté configurado
+import { ROLES } from "@/contexts/UserContext"; // Asegúrate de que UserContext y ROLES estén definidos
 
-
-let taskInstanceCounter = 3;
+// Colores base para las tareas (puedes expandir esta lista)
+const TASK_COLORS = [
+  "bg-blue-400/70 border border-blue-600/30",
+  "bg-green-400/70 border border-green-600/30",
+  "bg-red-400/70 border border-red-600/30",
+  "bg-purple-400/70 border border-purple-600/30",
+  "bg-yellow-400/70 border border-yellow-600/30",
+  "bg-indigo-400/70 border border-indigo-600/30",
+  "bg-pink-400/70 border border-pink-600/30",
+];
 
 const PlanningPage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useUser();
-  const isTechnician = user && user.role === ROLES.WORKER;
-  const [draggingTaskId, setDraggingTaskId] = useState(null);
-  const [hoveredCell, setHoveredCell] = useState({
-    employeeId: null,
-    day: null,
-  });
 
-  const [employees, setEmployees] = useState(() => {
-    if (isTechnician) {
-      return initialEmployees.filter(
-        (emp) =>
-          emp.id === user.id || emp.name.includes(user.name.split(" ")[0])
-      );
-    }
-    return initialEmployees;
-  });
-
-  const [availableTasks, setAvailableTasks] = useState([]);
-  const [allProjectsAsTasks, setAllProjectsAsTasks] = useState([]);
   const [assignments, setAssignments] = useState({});
+  const [vehicles, setVehicles] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [isTasksPanelOpen, setIsTasksPanelOpen] = useState(true);
-  const [showAssignVehicleDialog, setShowAssignVehicleDialog] = useState(false);
-  const [currentTaskForVehicle, setCurrentTaskForVehicle] = useState(null);
+  const [employees, setEmployees] = useState([]);
 
-  const fetchProjects = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("proyectos")
-        .select("*")
-        .eq("estado", "En Proceso")
+  // Estado para la asignación de múltiples vehículos por obra
+  // { projectId: [vehicleId1, vehicleId2, ...] }
+  const [projectVehicleAssignments, setProjectVehicleAssignments] = useState({});
 
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-      toast({
-        title: "Error al cargar proyectos",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  // Para asegurar colores consistentes para cada proyecto
+  const [projectColors, setProjectColors] = useState({});
 
   useEffect(() => {
-    const projectsAsTasks = projects.map((project) => ({
-      id: project.id,
+    const fetchData = async () => {
+      try {
+        const [vehiclesResponse, projectsResponse, usersResponse] = await Promise.all([
+          supabase.from("vehiculos").select("*").order("numero_interno"),
+          supabase.from("proyectos").select("*").eq("estado", "En Proceso"),
+          supabase.from("usuarios").select("*").eq("rol", ROLES.WORKER),
+        ]);
+
+        if (vehiclesResponse.error) throw vehiclesResponse.error;
+        if (projectsResponse.error) throw projectsResponse.error;
+        if (usersResponse.error) throw usersResponse.error;
+
+        setVehicles(vehiclesResponse.data || []);
+        setProjects(projectsResponse.data || []);
+        setEmployees(usersResponse.data || []);
+
+        // Generar colores consistentes para los proyectos
+        const initialProjectColors = {};
+        (projectsResponse.data || []).forEach((project, index) => {
+          initialProjectColors[project.id] = TASK_COLORS[index % TASK_COLORS.length];
+        });
+        setProjectColors(initialProjectColors);
+
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los datos",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchData();
+  }, [toast]);
+
+  // Modificación en onAssignTask: Si ya hay una tarea, la reemplaza.
+  const onAssignTask = useCallback((projectId, employeeId, day) => {
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+
+    const cellKey = `${employeeId}-${day}`;
+    const newAssignment = {
+      instanceId: `${project.id}-${employeeId}-${day}-${Date.now()}`,
+      projectId: project.id,
       title: project.nombre,
-      icon: Briefcase,
-      color: "bg-gray-400/70 border border-gray-600/30",
-      status: "pending",
+      color: projectColors[project.id], // Asignar el color del proyecto
+      vehicleId: null,
+      vehicleDisplay: null,
+    };
+
+    setAssignments((prev) => ({
+      ...prev,
+      [cellKey]: [newAssignment], // Reemplaza cualquier tarea existente en esta celda
     }));
+    toast({ title: "Tarea asignada", description: `"${project.nombre}" asignada a ${employees.find(e => e.id === employeeId)?.nombre || 'Empleado Desconocido'} el ${day}.` });
+  }, [projects, employees, projectColors, toast]); // Añadir projectColors a las dependencias
 
-    setAllProjectsAsTasks(projectsAsTasks);
-    setAvailableTasks(projectsAsTasks);
-    setAssignments({});
-  }, [projects]);
+  const onRemoveTask = useCallback((employeeId, day, instanceIdToRemove) => {
+    setAssignments((prev) => {
+      const cellKey = `${employeeId}-${day}`;
+      const newAssignments = { ...prev };
+      delete newAssignments[cellKey]; // Elimina la celda completa
+      return newAssignments;
+    });
+    toast({ title: "Tarea eliminada", description: "La tarea ha sido eliminada de la planificación." });
+  }, [toast]);
 
-  const getNewTaskInstanceCounter = () => {
-    const current = taskInstanceCounter;
-    taskInstanceCounter += 1;
-    return current;
-  };
-
-  const handleDragStart = useCallback(
-    (taskId) => {
-      if (isTechnician) return;
-      handleDragStartLogic(taskId, setDraggingTaskId);
-    },
-    [setDraggingTaskId, isTechnician]
-  );
-
-  const handleDrop = useCallback(
-    (employeeId, day, taskId) => {
-      if (isTechnician) return;
-      handleDropLogic(
-        employeeId,
-        day,
-        taskId,
-        allProjectsAsTasks,
-        employees.find((e) => e.id === employeeId)
-          ? [employees.find((e) => e.id === employeeId)]
-          : initialEmployees,
-        setAssignments,
-        toast,
-        getNewTaskInstanceCounter
-      );
-    },
-    [employees, toast, allProjectsAsTasks, setAssignments, isTechnician]
-  );
-
-  const handleDragEnd = useCallback(() => {
-    if (isTechnician) return;
-    handleDragEndLogic(
-      hoveredCell,
-      draggingTaskId,
-      handleDrop,
-      setDraggingTaskId,
-      setHoveredCell
-    );
-  }, [
-    hoveredCell,
-    draggingTaskId,
-    handleDrop,
-    setDraggingTaskId,
-    setHoveredCell,
-    isTechnician,
-  ]);
-
-  const handleCellPointerMove = useCallback(
-    (employeeId, day) => {
-      if (isTechnician) return;
-      handleCellPointerMoveLogic(
-        employeeId,
-        day,
-        draggingTaskId,
-        setHoveredCell
-      );
-    },
-    [draggingTaskId, setHoveredCell, isTechnician]
-  );
-
-  const handleCellPointerLeave = useCallback(() => {
-    if (isTechnician) return;
-    handleCellPointerLeaveLogic(setHoveredCell);
-  }, [setHoveredCell, isTechnician]);
-
-  const handleRemoveTask = useCallback(
-    (employeeId, day, taskInstanceIdToRemove) => {
-      if (isTechnician) {
-        toast({
-          title: "Acción no permitida",
-          description: "Los técnicos no pueden eliminar tareas.",
-          variant: "destructive",
-        });
-        return;
-      }
-      handleRemoveTaskLogic(
-        employeeId,
-        day,
-        taskInstanceIdToRemove,
-        setAssignments,
-        toast
-      );
-    },
-    [setAssignments, toast, isTechnician]
-  );
-
-  const handleAssignVehicleClick = useCallback(
-    (task, employeeId, day) => {
-      if (isTechnician) {
-        toast({
-          title: "Acción no permitida",
-          description: "Los técnicos no pueden asignar vehículos.",
-          variant: "destructive",
-        });
-        return;
-      }
-      handleAssignVehicleClickLogic(
-        task,
-        employeeId,
-        day,
-        setCurrentTaskForVehicle,
-        setShowAssignVehicleDialog
-      );
-    },
-    [setCurrentTaskForVehicle, setShowAssignVehicleDialog, isTechnician, toast]
-  );
-
-  const handleAssignVehicleConfirm = useCallback(
-    (employeeId, day, taskId, vehicle) => {
-      if (isTechnician) return;
-      handleAssignVehicleConfirmLogic(
-        employeeId,
-        day,
-        taskId,
-        vehicle,
-        currentTaskForVehicle,
-        setAssignments,
-        toast,
-        setShowAssignVehicleDialog,
-        setCurrentTaskForVehicle
-      );
-    },
-    [
-      currentTaskForVehicle,
-      setAssignments,
-      toast,
-      setShowAssignVehicleDialog,
-      setCurrentTaskForVehicle,
-      isTechnician,
-    ]
-  );
-
-  const handleShowTaskDetails = useCallback(
-    (projectId) => {
-      handleShowTaskDetailsLogic(projectId, toast, navigate);
-    },
-    [toast, navigate]
-  );
-
-  const handleCopyTask = useCallback(
-    (taskToCopy, originalEmployeeId, originalDay) => {
-      if (isTechnician) {
-        toast({
-          title: "Acción no permitida",
-          description: "Los técnicos no pueden copiar tareas.",
-          variant: "destructive",
-        });
-        return;
-      }
-      handleCopyTaskLogic(taskToCopy, toast);
-    },
-    [toast, isTechnician]
-  );
-
-  const handleImportExcel = () => {
-    if (isTechnician) {
-      toast({
-        title: "Acción no permitida",
-        description: "Los técnicos no pueden importar datos.",
-        variant: "destructive",
+  const onUpdateAssignmentVehicle = useCallback((employeeId, day, instanceId, newVehicleId) => {
+    setAssignments((prev) => {
+      const cellKey = `${employeeId}-${day}`;
+      const updatedAssignments = (prev[cellKey] || []).map((assignment) => {
+        if (assignment.instanceId === instanceId) {
+          const vehicle = vehicles.find((v) => v.id === newVehicleId);
+          return {
+            ...assignment,
+            vehicleId: newVehicleId,
+            vehicleDisplay: vehicle ? `${vehicle.numero_interno} - ${vehicle.patente}` : null,
+          };
+        }
+        return assignment;
       });
-      return;
-    }
-    handleImportExcelLogic(toast);
-  };
+      return {
+        ...prev,
+        [cellKey]: updatedAssignments,
+      };
+    });
+    toast({ title: "Vehículo actualizado", description: "El vehículo de la tarea ha sido asignado/cambiado." });
+  }, [vehicles, toast]);
+
+  const onShowTaskDetails = useCallback((projectId) => {
+    navigate(`/projects/${projectId}`);
+    toast({ title: "Detalles de Obra", description: `Navegando a los detalles de la obra ${projectId}.` });
+  }, [navigate, toast]);
+
+  const onCopyTask = useCallback((taskToCopy, sourceEmployeeId, sourceDay) => {
+    toast({ title: "Copiar Tarea", description: `Copiando la tarea "${taskToCopy.title}". (Funcionalidad de pegar no implementada)` });
+  }, [toast]);
+
+
+  // Nuevas funciones para gestionar múltiples vehículos por obra
+  const addVehicleToProject = useCallback((projectId, vehicleId) => {
+    setProjectVehicleAssignments(prev => ({
+      ...prev,
+      [projectId]: Array.from(new Set([...(prev[projectId] || []), vehicleId])), // Usa Set para evitar duplicados
+    }));
+    toast({ title: "Vehículo asignado a obra", description: "Vehículo añadido a la lista de la obra." });
+  }, [toast]);
+
+  const removeVehicleFromProject = useCallback((projectId, vehicleId) => {
+    setProjectVehicleAssignments(prev => ({
+      ...prev,
+      [projectId]: (prev[projectId] || []).filter(id => id !== vehicleId),
+    }));
+    toast({ title: "Vehículo desasignado de obra", description: "Vehículo eliminado de la lista de la obra." });
+  }, [toast]);
+
+
   return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className="flex flex-col h-[calc(100vh-4rem)] p-2 md:p-4 bg-background text-foreground"
-      >
-        <div className="flex flex-col md:flex-row items-center justify-between mb-3 md:mb-4 gap-2">
-          <h1 className="text-xl md:text-3xl font-bold text-primary flex items-center">
-            <CalendarDays className="mr-2 md:mr-3 h-6 w-6 md:h-8 md:w-8" />
-            Planificación Semanal
-          </h1>
-          {!isTechnician && (
-            <div className="flex gap-2">
-              <Button
-                onClick={handleImportExcel}
-                variant="outline"
-                size="sm"
-                className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
+    <div className="flex flex-col h-full gap-4 p-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <CalendarDays className="h-6 w-6" />
+          Planificación Semanal
+        </h1>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {/* Grilla de Planificación */}
+        <div className="w-full">
+          <PlanningGrid
+            employees={employees}
+            daysOfWeek={daysOfWeek}
+            assignments={assignments}
+            onAssignTask={onAssignTask}
+            onRemoveTask={onRemoveTask}
+            onUpdateAssignmentVehicle={onUpdateAssignmentVehicle}
+            onShowTaskDetails={onShowTaskDetails}
+            onCopyTask={onCopyTask}
+            projects={projects}
+            vehicles={vehicles}
+          />
+        </div>
+
+        {/* Sección de Obras Activas y Asignación de Vehículos */}
+        <div className="bg-card rounded-lg border p-4">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Briefcase className="h-5 w-5" />
+            Obras Activas y Gestión de Vehículos
+          </h2>
+          <div className="grid gap-4">
+            {projects.map((project) => (
+              <div
+                key={project.id}
+                className="grid grid-cols-[1fr,auto] gap-4 items-center p-4 bg-muted/50 rounded-lg border"
               >
-                <UploadCloud className="mr-1.5 h-4 w-4" />
-                Importar
-              </Button>
-            </div>
-          )}
-        </div>
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded border ${projectColors[project.id] || "bg-primary/10 border-primary/20"}`}>
+                    {project.nombre}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Vehículos asignados a la obra */}
+                  {(projectVehicleAssignments[project.id] || []).map(vehicleId => {
+                    const assignedVehicle = vehicles.find(v => v.id === vehicleId);
+                    return assignedVehicle ? (
+                      <span key={vehicleId} className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                        {assignedVehicle.numero_interno} - {assignedVehicle.patente}
+                        <button
+                          type="button"
+                          onClick={() => removeVehicleFromProject(project.id, vehicleId)}
+                          className="ml-1 -mr-0.5 h-3 w-3 rounded-full bg-blue-200 text-blue-800 hover:bg-blue-300"
+                        >
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </span>
+                    ) : null;
+                  })}
 
-        <div className="flex-grow flex flex-col lg:grid lg:grid-cols-12 gap-3 md:gap-4 overflow-hidden">
-          <div className="lg:col-span-9 flex flex-col overflow-hidden h-[50vh] lg:h-auto">
-            <PlanningGrid
-              employees={employees}
-              daysOfWeek={daysOfWeek}
-              assignments={assignments}
-              hoveredCell={hoveredCell}
-              draggingTaskId={draggingTaskId}
-              onCellPointerMove={handleCellPointerMove}
-              onCellPointerLeave={handleCellPointerLeave}
-              onRemoveTask={handleRemoveTask}
-              onAssignVehicleClick={handleAssignVehicleClick}
-              onShowTaskDetails={handleShowTaskDetails}
-              onCopyTask={handleCopyTask}
-              isTechnicianView={isTechnician}
-            />
+                  {/* Selector para añadir nuevos vehículos a la obra */}
+                  <Select
+                    value="" // Siempre resetear el valor para permitir seleccionar de nuevo
+                    onValueChange={(value) => addVehicleToProject(project.id, value)}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Añadir vehículo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vehicles.length > 0 ? (
+                        vehicles.map((vehicle) => (
+                          // Solo mostrar vehículos que no están ya asignados a esta obra
+                          !(projectVehicleAssignments[project.id] || []).includes(vehicle.id) && (
+                            <SelectItem key={vehicle.id} value={vehicle.id}>
+                              {vehicle.numero_interno} - {vehicle.patente}
+                            </SelectItem>
+                          )
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>No hay vehículos disponibles</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ))}
           </div>
-          {!isTechnician && (
-            <div className="lg:col-span-3 flex flex-col mt-3 lg:mt-0 h-[calc(50vh-6rem)] lg:h-auto">
-              <AvailableTasksPanel
-                tasks={availableTasks}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                isOpen={isTasksPanelOpen}
-                setIsOpen={setIsTasksPanelOpen}
-                isDraggable={!isTechnician}
-              />
-            </div>
-          )}
-          {isTechnician && (
-            <div className="lg:col-span-3 flex flex-col mt-3 lg:mt-0 h-[calc(50vh-6rem)] lg:h-auto p-4 bg-card rounded-lg shadow">
-              <h2 className="text-lg font-semibold text-primary mb-2">
-                Mis Tareas
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Aquí verás un resumen de tus tareas asignadas para la semana.
-              </p>
-              <p className="text-xs text-muted-foreground mt-auto">
-                La modificación de la planificación es gestionada por
-                supervisores o administradores.
-              </p>
-            </div>
-          )}
         </div>
-        {!isTechnician && (
-          <p className="text-center text-xs text-muted-foreground mt-2 md:mt-4">
-            Arrastra proyectos activos al calendario. Gestiona estados de
-            proyecto en la página de Proyectos.
-          </p>
-        )}
-      </motion.div>
-
-      {!isTechnician && (
-        <AssignVehicleDialog
-          isOpen={showAssignVehicleDialog}
-          onOpenChange={setShowAssignVehicleDialog}
-          taskInfo={currentTaskForVehicle}
-          onAssignVehicleConfirm={handleAssignVehicleConfirm}
-        />
-      )}
-    </>
+      </div>
+    </div>
   );
 };
 

@@ -5,13 +5,11 @@ const UserContext = createContext();
 export const useUser = () => useContext(UserContext);
 
 export const ROLES = {
-  ADMIN: 'admin',
-  CEO: 'ceo',
-  SUPERVISOR: 'supervisor',
-  WORKER: 'worker',
-  DEVELOPER: 'developer',
-  PENDING: 'pending',
-  REJECTED: 'rejected'
+  ADMIN: 'ADMINISTRADOR',
+  CEO: 'CEO',
+  SUPERVISOR: 'SUPERVISOR',
+  WORKER: 'TECNICO',
+  DEVELOPER: 'DESARROLLADOR',
 };
 
 const MOCKED_USER = {
