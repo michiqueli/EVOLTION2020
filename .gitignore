@@ -2,6 +2,7 @@
 /node_modules
 /.vite
 /.qodo
+/dist
 
 # dotenv environment variable files
 .env
