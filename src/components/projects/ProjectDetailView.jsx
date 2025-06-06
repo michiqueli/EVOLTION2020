@@ -15,7 +15,7 @@ import {
   Paperclip,
   ExternalLink,
 } from "lucide-react";
-import { getStatusStyles } from "./ProjectCard";
+import { getStatusStyles, projectStatusOptions} from "./ProjectCard";
 import { cn } from "@/lib/utils";
 
 const ProjectDetailView = ({ isOpen, onOpenChange, project }) => {
@@ -26,16 +26,13 @@ const ProjectDetailView = ({ isOpen, onOpenChange, project }) => {
     : [];
   const statusStyle = getStatusStyles(project.estado);
 
-  // URL para abrir la dirección en Google Maps (navegador)
-  // Utiliza el endpoint de búsqueda con el parámetro 'query'
+
   const googleMapsUrl = project.direccion
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         project.direccion
       )}`
     : null;
 
-  // URL para incrustar el mapa de Google Maps en un iframe
-  // Utiliza el endpoint de embed con el parámetro 'q' (query) y tu clave API
   const googleMapsEmbedUrl = project.direccion
     ? `https://www.google.com/maps/embed/v1/place?q=${encodeURIComponent(
         project.direccion
