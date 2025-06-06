@@ -1,6 +1,10 @@
 // src/components/planning/AssignedTaskItem.jsx
 import React, { useState } from "react";
-import { MoreVertical, Trash2, Copy, Car, Info, Edit3 } from "lucide-react";
+import {
+  MoreVertical,
+  Trash2,
+  Info,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,63 +24,42 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 import { cn } from "@/lib/utils";
+
+// Importar format de date-fns para formatear la fecha
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+
 
 export const AssignedTaskItem = React.memo(
   ({
     task, // Contiene: { instanceId, projectId, title, vehicleId, vehicleDisplay, color }
     employeeId,
-    day,
+    day, // Ahora 'day' es un objeto: { fullDate, dayName, dayOfMonth, monthName, isToday }
     onRemoveTask,
-    onAssignVehicleClick,
     onShowTaskDetails,
-    onCopyTask,
     employeesList,
-    vehicles,
   }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [showVehicleSelector, setShowVehicleSelector] = useState(false);
-    const [selectedVehicleForAssignment, setSelectedVehicleForAssignment] =
-      useState(task.vehicleId || "");
 
     const employeeName =
       employeesList.find((e) => e.id === employeeId)?.nombre || employeeId;
 
-    const handleVehicleAssignment = () => {
-      onAssignVehicleClick(
-        employeeId,
-        day,
-        task.instanceId,
-        selectedVehicleForAssignment
-      );
-      setShowVehicleSelector(false);
-    };
+    // Formatear la fecha para mostrar en el diálogo de eliminación
+    const formattedDayForDisplay = day.fullDate ? format(day.fullDate, 'EEEE d \'de\' MMMM', { locale: es }) : day.dayName;
+
 
     return (
       <>
         <div
-          // Usa task.color directamente para el fondo y el borde
           className={`group relative p-1 md:p-1.5 rounded-sm text-[10px] md:text-[11px] ${
-            task.color || "bg-gray-200 border border-gray-400" // Fallback si no hay color
+            task.color || "bg-gray-200 border border-gray-400"
           } text-black shadow-sm overflow-hidden`}
         >
           <div className="flex justify-between items-start">
             <div className="flex-grow min-w-0">
               <p className="font-semibold truncate">{task.title}</p>
-              {task.vehicleDisplay && (
-                <div className="flex items-center text-[9px] md:text-[10px] opacity-80 mt-0.5">
-                  <Car className="h-3 w-3 mr-1 flex-shrink-0" />
-                  <span className="truncate">{task.vehicleDisplay}</span>
-                </div>
-              )}
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -94,28 +77,9 @@ export const AssignedTaskItem = React.memo(
               >
                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    setSelectedVehicleForAssignment(task.vehicleId || "");
-                    setShowVehicleSelector(true);
-                  }}
-                >
-                  <Edit3 className="mr-2 h-3.5 w-3.5" />
-                  {task.vehicleDisplay
-                    ? "Cambiar Furgoneta"
-                    : "Asignar Furgoneta"}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => onShowTaskDetails(task.projectId)}
-                >
+                <DropdownMenuItem onClick={() => onShowTaskDetails(task.projectId)}>
                   <Info className="mr-2 h-3.5 w-3.5" />
                   Info Obra
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => onCopyTask(task, employeeId, day)}
-                >
-                  <Copy className="mr-2 h-3.5 w-3.5" />
-                  Copiar Tarea
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -143,68 +107,17 @@ export const AssignedTaskItem = React.memo(
               <AlertDialogDescription>
                 La tarea "{task.title}" será eliminada de la planificación de{" "}
                 <span className="font-semibold">{employeeName}</span> para el{" "}
-                <span className="font-semibold">{day}</span>. Esta acción no se
-                puede deshacer.
+                <span className="font-semibold">{formattedDayForDisplay}</span>. {/* <--- CAMBIO AQUÍ */}
+                Esta acción no se puede deshacer.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => onRemoveTask(employeeId, day, task.instanceId)}
+                onClick={() => onRemoveTask(employeeId, day.fullDate.toISOString().split('T')[0], task.instanceId)} // <--- Asegúrate que onRemoveTask reciba la fecha formateada si la usa como clave
                 className="bg-destructive hover:bg-destructive/90"
               >
                 Eliminar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* AlertDialog para seleccionar/cambiar vehículo */}
-        <AlertDialog
-          open={showVehicleSelector}
-          onOpenChange={setShowVehicleSelector}
-        >
-          <AlertDialogContent className="sm:max-w-md">
-            {" "}
-            {/* Mejora del estilo del modal */}
-            <AlertDialogHeader className="text-center">
-              <AlertDialogTitle className="text-xl font-bold text-primary">
-                Asignar Furgoneta
-              </AlertDialogTitle>
-              <p className="text-sm text-muted-foreground">
-                Selecciona una furgoneta para la tarea:{" "}
-                <span className="font-semibold">{task.title}</span>
-              </p>
-            </AlertDialogHeader>
-            <div className="p-2 border rounded-md bg-accent/20">
-              <Select
-                value={selectedVehicleForAssignment}
-                onValueChange={setSelectedVehicleForAssignment}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar vehículo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vehicles.length > 0 ? (
-                    vehicles.map((vehicle) => (
-                      <SelectItem key={vehicle.id} value={vehicle.id}>
-                        {vehicle.numero_interno} - {vehicle.patente}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="" disabled>
-                      No hay vehículos disponibles
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setShowVehicleSelector(false)}>
-                Cancelar
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={handleVehicleAssignment}>
-                Asignar
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -1,28 +1,32 @@
 // src/components/planning/PlanningGrid.jsx
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Users, Briefcase } from "lucide-react";
+import { Users, Briefcase, Plus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogFooter,
+  AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { AssignedTaskItem } from "@/components/planning/AssignedTaskItem";
+
+// Importar isToday de date-fns para resaltar el día actual
+import { isToday } from 'date-fns';
 
 const PlanningGridCell = React.memo(
   ({
     tasks,
     employeeId,
-    day,
+    // day ya no es un string simple, ahora es un objeto { fullDate, dayName, dayOfMonth, monthName, isToday }
+    day, // Recibe el objeto completo 'day'
     onRemoveTask,
-    onUpdateAssignmentVehicle,
     onShowTaskDetails,
-    onCopyTask,
     employeesList,
-    vehicles,
+    onEmptyCellClick
   }) => {
     return (
       <div
@@ -36,51 +40,54 @@ const PlanningGridCell = React.memo(
             key={task.instanceId}
             task={task}
             employeeId={employeeId}
+            // Pasa el objeto day completo a AssignedTaskItem si se usa en su lógica (actualmente no, pero por si acaso)
             day={day}
             onRemoveTask={onRemoveTask}
-            onAssignVehicleClick={onUpdateAssignmentVehicle}
             onShowTaskDetails={onShowTaskDetails}
-            onCopyTask={onCopyTask}
             employeesList={employeesList}
-            vehicles={vehicles}
           />
         ))}
-        {tasks.length === 0 && <div className="flex-grow"></div>}
+
+        {tasks.length === 0 && (
+          <div
+            className="flex-grow flex items-center justify-center cursor-pointer opacity-50 hover:opacity-100 transition-opacity"
+            // Pasa el objeto day completo a onEmptyCellClick
+            onClick={() => onEmptyCellClick(employeeId, day)}
+          >
+            <Plus className="h-8 w-8 md:h-10 md:w-10 text-muted-foreground hover:text-primary transition-colors" />
+          </div>
+        )}
       </div>
     );
   }
 );
 
+
 export const PlanningGrid = React.memo(
   ({
     employees,
-    daysOfWeek,
+    // daysOfWeek ya no se recibe
+    weekDates, // <--- Recibe el array de objetos de fecha
     assignments,
     onAssignTask,
     onRemoveTask,
-    onUpdateAssignmentVehicle,
     onShowTaskDetails,
-    onCopyTask,
     projects,
     vehicles,
   }) => {
     const [selectedCell, setSelectedCell] = useState(null);
     const [showTaskSelector, setShowTaskSelector] = useState(false);
 
-    // Función para manejar el clic en una celda de la grilla
-    const handleCellClick = (employeeId, day, cellTasks) => {
-      // Solo abrir el selector si la celda está vacía
-      if (cellTasks.length === 0) {
-        setSelectedCell({ employeeId, day });
-        setShowTaskSelector(true);
-      }
-      // Si la celda no está vacía, no se abre el selector al hacer clic en ella.
-      // Las acciones sobre la tarea se realizan desde el DropdownMenu de la tarea misma.
+    // handleEmptyCellClick ahora espera un objeto 'day' completo
+    const handleEmptyCellClick = (employeeId, dayObject) => {
+      setSelectedCell({ employeeId, day: dayObject }); // Guarda el objeto completo
+      setShowTaskSelector(true);
     };
 
+    // handleSelectTask ahora espera un objeto 'day' completo desde selectedCell
     const handleSelectTask = (projectId) => {
       if (selectedCell) {
-        onAssignTask(projectId, selectedCell.employeeId, selectedCell.day);
+        onAssignTask(projectId, selectedCell.employeeId, selectedCell.day); // Pasa el objeto day
       }
       setShowTaskSelector(false);
       setSelectedCell(null);
@@ -89,22 +96,27 @@ export const PlanningGrid = React.memo(
     return (
       <>
         <div className="flex-grow overflow-auto rounded-lg border border-border bg-card shadow-inner">
-          {/* Encabezado de la Grilla */}
+          {/* Encabezado de la Grilla (Días de la semana con fechas) */}
           <div className="grid grid-cols-[80px_repeat(7,minmax(100px,1fr))] md:grid-cols-[120px_repeat(7,minmax(120px,1fr))] sticky top-0 bg-muted z-20 border-b-2 border-border">
             <div className="p-1 md:p-3 text-[10px] md:text-sm font-semibold text-primary border-r border-border/30 flex items-center justify-center sticky left-0 bg-muted z-10">
               <Users className="h-3 w-3 md:h-5 md:w-5 mr-0.5 md:mr-2" /> Equipo
             </div>
-            {daysOfWeek.map((day) => (
+            {weekDates.map((day) => ( // Iterar sobre weekDates
               <div
-                key={day}
-                className="p-1 md:p-3 text-[10px] md:text-sm font-semibold text-primary text-center border-r border-border/30 last:border-r-0"
+                key={day.fullDate.toISOString()} // Usar la fecha completa como clave única
+                className={cn(
+                  "p-1 md:p-3 text-[10px] md:text-sm font-semibold text-primary text-center border-r border-border/30 last:border-r-0",
+                  day.isToday && "bg-primary/10 text-primary-foreground font-bold rounded-t-lg" // Resaltar el día actual
+                )}
               >
-                {day.substring(0, 3)}
+                <span className="block text-xs md:text-sm">{day.dayName.charAt(0).toUpperCase() + day.dayName.slice(1)}.</span> {/* Lunes, Martes, etc. */}
+                <span className="block text-lg md:text-xl font-bold">{day.dayOfMonth}</span> {/* 6, 7, etc. */}
+                <span className="block text-xs md:text-sm text-muted-foreground">{day.monthName}.</span> {/* Jun, Jul, etc. */}
               </div>
             ))}
           </div>
 
-          {/* Filas de la Grilla */}
+          {/* Filas de la Grilla (Empleados y sus celdas de tareas) */}
           <div className="min-w-[780px] md:min-w-[960px]">
             {employees.map((employee) => (
               <div
@@ -118,26 +130,23 @@ export const PlanningGrid = React.memo(
                   </span>
                 </div>
                 {/* Celdas de Días para el Empleado */}
-                {daysOfWeek.map((day) => {
-                  const cellKey = `${employee.id}-${day}`;
+                {weekDates.map((day) => { // Iterar sobre weekDates
+                  const cellKey = `${employee.id}-${day.fullDate.toISOString().split('T')[0]}`; // Usar la fecha ISO como clave
                   const cellTasks = assignments[cellKey] || [];
 
                   return (
                     <motion.div
-                      key={cellKey}
+                      key={cellKey} // Clave basada en employee y fecha
                       className="relative"
-                      onClick={() => handleCellClick(employee.id, day, cellTasks)} // Pasa cellTasks para la lógica condicional
                     >
                       <PlanningGridCell
                         tasks={cellTasks}
                         employeeId={employee.id}
-                        day={day}
+                        day={day} // Pasa el objeto day completo
                         onRemoveTask={onRemoveTask}
-                        onUpdateAssignmentVehicle={onUpdateAssignmentVehicle}
                         onShowTaskDetails={onShowTaskDetails}
-                        onCopyTask={onCopyTask}
                         employeesList={employees}
-                        vehicles={vehicles}
+                        onEmptyCellClick={handleEmptyCellClick}
                       />
                     </motion.div>
                   );
@@ -149,12 +158,12 @@ export const PlanningGrid = React.memo(
 
         {/* Selector de Obra (AlertDialog) */}
         <AlertDialog open={showTaskSelector} onOpenChange={setShowTaskSelector}>
-          <AlertDialogContent className="sm:max-w-md"> {/* Mejora del estilo del modal */}
+          <AlertDialogContent className="sm:max-w-md">
             <AlertDialogHeader className="text-center">
               <AlertDialogTitle className="text-xl font-bold text-primary">Seleccionar Obra</AlertDialogTitle>
               <p className="text-sm text-muted-foreground">Asigna una obra a esta celda de planificación.</p>
             </AlertDialogHeader>
-            <div className="grid gap-3 max-h-[300px] overflow-auto p-2 border rounded-md bg-accent/20"> {/* Estilo de la lista */}
+            <div className="grid gap-3 max-h-[300px] overflow-auto p-2 border rounded-md bg-accent/20">
               {projects.length > 0 ? (
                 projects.map((project) => (
                   <button
@@ -170,12 +179,9 @@ export const PlanningGrid = React.memo(
                 <p className="text-center text-muted-foreground p-4">No hay obras activas para asignar.</p>
               )}
             </div>
-            {/* Opcional: Footer con un botón de "Cerrar" si no hay obras */}
-            {projects.length === 0 && (
-                <div className="flex justify-end pt-4">
-                    <Button onClick={() => setShowTaskSelector(false)} variant="outline">Cerrar</Button>
-                </div>
-            )}
+            <AlertDialogFooter className="pt-4 flex justify-end">
+              <AlertDialogCancel onClick={() => setShowTaskSelector(false)}>Cancelar</AlertDialogCancel>
+            </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       </>
