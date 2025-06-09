@@ -1,4 +1,3 @@
-// src/components/planning/AssignedTaskItem.jsx
 import React, { useState } from "react";
 import {
   MoreVertical,
@@ -24,19 +23,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-import { cn } from "@/lib/utils";
-
-// Importar format de date-fns para formatear la fecha
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 
 export const AssignedTaskItem = React.memo(
   ({
-    task, // Contiene: { instanceId, projectId, title, vehicleId, vehicleDisplay, color }
+    task,
     employeeId,
-    day, // Ahora 'day' es un objeto: { fullDate, dayName, dayOfMonth, monthName, isToday }
+    day,
     onRemoveTask,
     onShowTaskDetails,
     employeesList,
@@ -45,8 +40,6 @@ export const AssignedTaskItem = React.memo(
 
     const employeeName =
       employeesList.find((e) => e.id === employeeId)?.nombre || employeeId;
-
-    // Formatear la fecha para mostrar en el diálogo de eliminación
     const formattedDayForDisplay = day.fullDate ? format(day.fullDate, 'EEEE d \'de\' MMMM', { locale: es }) : day.dayName;
 
 
@@ -58,8 +51,8 @@ export const AssignedTaskItem = React.memo(
           } text-black shadow-sm overflow-hidden`}
         >
           <div className="flex justify-between items-start">
-            <div className="flex-grow min-w-0">
-              <p className="font-semibold truncate">{task.title}</p>
+            <div className="flex-grow min-w-0 text-center">
+              <p className="font-semibold text-sm truncate">{task.title}</p>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

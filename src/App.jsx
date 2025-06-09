@@ -10,8 +10,6 @@ import AssistantPage from '@/pages/AssistantPage';
 import ReportsPage from '@/pages/ReportsPage';
 import ProfilePage from '@/pages/ProfilePage';
 import PlanningPage from '@/pages/PlanningPage';
-// AdminUsersPage ya no se usa directamente, se accede a través de GlobalSettingsPage
-// import AdminUsersPage from '@/pages/AdminUsersPage'; 
 import GlobalSettingsPage from '@/pages/GlobalSettingsPage';
 import { UserProvider, useUser, ROLES } from '@/contexts/UserContext';
 
@@ -68,7 +66,7 @@ const AppContent = () => {
         element={<ProtectedRoute allowedRoles={allAuthenticatedRoles}><Layout><ProjectsPage /></Layout></ProtectedRoute>} 
       />
       <Route 
-        path="/activities" 
+        path="/activities"
         element={<ProtectedRoute allowedRoles={allAuthenticatedRoles}><Layout><ActivitiesPage /></Layout></ProtectedRoute>} 
       />
       <Route 
@@ -87,16 +85,10 @@ const AppContent = () => {
         path="/profile" 
         element={<ProtectedRoute allowedRoles={allAuthenticatedRoles}><Layout><ProfilePage /></Layout></ProtectedRoute>} 
       />
-      {/* La ruta /admin/users se elimina o se redirige si es necesario, ya que ahora está dentro de /admin/settings */}
-      {/* <Route 
-        path="/admin/users" 
-        element={<ProtectedRoute allowedRoles={adminRolesForRoutes}><Layout><AdminUsersPage /></Layout></ProtectedRoute>} 
-      /> */}
       <Route 
         path="/admin/settings" 
         element={<ProtectedRoute allowedRoles={adminRolesForRoutes}><Layout><GlobalSettingsPage /></Layout></ProtectedRoute>} 
       />
-      
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
