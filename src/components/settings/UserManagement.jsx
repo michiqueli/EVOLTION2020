@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { supabase } from "@/lib/supabaseClient";
-import { useUser as useAuthUser } from "@/contexts/UserContext";
-import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   UserCheck,
+  UserPlus,
+  Edit,
   UserX,
   RefreshCw,
   Users,
@@ -17,25 +25,6 @@ import {
   Trash2,
   ShieldQuestion,
 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -45,641 +34,402 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ROLES } from "@/contexts/UserContext";
+import DataTable from "@/components/ui/data-table";
+import { PasswordInput } from "@/components/ui/password-input";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabaseClient";
+import { useUser } from "@/contexts/UserContext";
 
-const UserManagement = () => {
-  const { user: adminAuthUser, loading: userAuthLoading } = useAuthUser();
+const UserManagementPage = () => {
+  const { user: adminUser } = useUser();
+  const [users, setUsers] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+    full_name: "",
+    role: "TECNICO",
+  });
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const [allUsers, setAllUsers] = useState([]);
-  const [usersForReview, setUsersForReview] = useState([]);
-  const [approvedUsers, setApprovedUsers] = useState([]);
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const USER_ROLES = ["TECNICO", "ADMIN", "DESARROLLADOR", "CEO"];
 
-  const [selectedUserForAction, setSelectedUserForAction] = useState(null);
-  const [actionType, setActionType] = useState(""); // 'aceptado', 'rechazado', 'delete'
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
-  const [editFormData, setEditFormData] = useState({ nombre: "", rol: "" });
-
-  const fetchAllSystemUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async () => {
     setIsLoading(true);
-    setError("");
-    try {
-      const { data, error: fetchError } = await supabase
-        .from("usuarios")
-        .select("*");
 
-      if (fetchError) throw fetchError;
+    // Reemplaza la llamada a supabase.auth.admin con esto:
+    const { data: authUsersResponse, error: functionError } =
+      await supabase.functions.invoke("manage-users");
 
-      if (Array.isArray(data)) {
-        setAllUsers(data);
-        setUsersForReview(
-          data.filter(
-            (u) => u.estado === "pendiente" || u.estado === "rechazado"
-          )
-        );
-        setApprovedUsers(
-          data.filter(
-            (u) =>
-              u.rol === ROLES.ADMIN ||
-              u.estado === ROLES.CEO ||
-              u.estado === ROLES.SUPERVISOR ||
-              u.estado === ROLES.WORKER ||
-              u.estado === ROLES.DEVELOPER ||
-              u.estado === "aceptado"
-          )
-        );
-      } else {
-        setAllUsers([]);
-        setUsersForReview([]);
-        setApprovedUsers([]);
-        console.warn("Received non-array data from get-all-users:", data);
-        setError("Formato de datos inesperado del servidor.");
-      }
-    } catch (e) {
-      console.error("Error fetching users:", e);
-      setError(`Error al cargar usuarios: ${e.message}`);
+    if (functionError) {
       toast({
-        title: "Error de Carga",
-        description: `No se pudieron cargar los usuarios. ${e.message}`,
+        title: "Error al invocar la función",
+        description: functionError.message,
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
+      return;
     }
+
+    // La respuesta de la función es directamente el array de usuarios
+    const authUsers = { users: authUsersResponse };
+
+    const { data: profiles, error: profileError } = await supabase
+      .from("usuarios")
+      .select("*");
+    if (profileError) {
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los perfiles de usuario.",
+        variant: "destructive",
+      });
+    }
+
+    const combinedUsers = authUsers.users.map((authUser) => {
+      const profile = profiles?.find((p) => p.user_id === authUser.id);
+      console.log(profile)
+      return {
+        id: authUser.id,
+        email: authUser.email,
+        full_name:
+          profile?.nombre || authUser.user_metadata?.full_name || "N/A",
+        role: profile?.rol || "N/A",
+        created_at: new Date(authUser.created_at).toLocaleDateString(),
+        last_sign_in_at: authUser.last_sign_in_at
+          ? new Date(authUser.last_sign_in_at).toLocaleString()
+          : "Nunca",
+      };
+    });
+
+    setUsers(combinedUsers);
+    setIsLoading(false);
   }, [toast]);
 
   useEffect(() => {
-    if (!userAuthLoading) {
-      fetchAllSystemUsers();
+    if (adminUser) {
+      fetchUsers();
     }
-  }, [fetchAllSystemUsers, userAuthLoading]);
+  }, [adminUser, fetchUsers]);
 
-  const openConfirmationDialog = (userToAction, typeOfAction) => {
-    setSelectedUserForAction(userToAction);
-    setActionType(typeOfAction);
-    setIsConfirmDialogOpen(true);
+  const handleInputChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const closeConfirmationDialog = () => {
-    setSelectedUserForAction(null);
-    setActionType("");
-    setIsConfirmDialogOpen(false);
+  const handleSelectChange = (name, value) => {
+    setFormData({ ...formData, [name]: value });
   };
 
-  const handleStatusUpdate = async () => {
-    if (!selectedUserForAction || !actionType || actionType === "delete")
-      return;
-
-    const targetUserId = selectedUserForAction.id;
-    const newStatus = actionType;
-
-    const originalUsers = [...allUsers];
-    setAllUsers((prevUsers) =>
-      prevUsers.map((u) =>
-        u.id === targetUserId
-          ? { ...u, estado: newStatus, rol: u.rol_solicitado || u.rol }
-          : u
-      )
-    );
-
-    closeConfirmationDialog();
-
-    try {
-      const { error: updateError } = await supabase
-        .from("usuarios")
-        .update({
-          estado: newStatus,
-          rol:
-            selectedUserForAction.rol_solicitado || selectedUserForAction.rol,
-        })
-        .eq("id", targetUserId);
-
-      if (updateError) throw updateError;
-
-      toast({
-        title: "Estado Actualizado",
-        description: `El estado de ${selectedUserForAction.nombre} ha sido actualizado a ${newStatus}.`,
-        variant: "success",
-      });
-      fetchAllSystemUsers();
-    } catch (e) {
-      console.error("Error updating user status:", e);
-      setError(`Error al actualizar estado: ${e.message}`);
-      toast({
-        title: "Error al Actualizar",
-        description: `No se pudo actualizar el estado. ${e.message}`,
-        variant: "destructive",
-      });
-      setAllUsers(originalUsers);
-    }
+  const resetFormAndClose = () => {
+    setFormData({ email: "", password: "", full_name: "", role: "TECNICO" });
+    setCurrentUser(null);
+    setIsModalOpen(false);
   };
 
-  const handleDeleteUser = async () => {
-    if (!selectedUserForAction || actionType !== "delete") return;
-
-    const targetUserId = selectedUserForAction.user_id;
-    const originalUsers = [...allUsers];
-    setAllUsers((prevUsers) =>
-      prevUsers.filter((u) => u.user_id !== targetUserId)
-    );
-    closeConfirmationDialog();
-
-    try {
-      const { error: deleteError } = await supabase
-        .from("usuarios")
-        .update({ estado: "deleted_by_admin" })
-        .eq("id", targetUserId);
-
-      if (deleteError) throw deleteError;
-
-      toast({
-        title: "Usuario Eliminado",
-        description: `El usuario ${selectedUserForAction.nombre} ha sido marcado para eliminación.`,
-        variant: "success",
-      });
-      fetchAllSystemUsers();
-    } catch (e) {
-      console.error("Error deleting user:", e);
-      toast({
-        title: "Error al Eliminar",
-        description: `No se pudo eliminar el usuario. ${e.message}`,
-        variant: "destructive",
-      });
-      setAllUsers(originalUsers);
-    }
+  const openModalForCreate = () => {
+    setCurrentUser(null);
+    setFormData({ email: "", password: "", full_name: "", role: "TECNICO" });
+    setIsModalOpen(true);
   };
 
-  const openEditModal = (userToEdit) => {
-    setEditingUser(userToEdit);
-    setEditFormData({
-      nombre: userToEdit.nombre,
-      rol: userToEdit.rol,
+  const openModalForEdit = (userToEdit) => {
+    setCurrentUser(userToEdit);
+    setFormData({
       email: userToEdit.email,
+      password: "",
+      full_name: userToEdit.full_name,
+      role: userToEdit.role,
     });
-    setIsEditModalOpen(true);
+    setIsModalOpen(true);
   };
 
-  const handleEditFormChange = (e) => {
-    const { name, value } = e.target;
-    setEditFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleEditFormRoleChange = (value) => {
-    setEditFormData((prev) => ({ ...prev, rol: value }));
-  };
-
-  const handleEditSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!editingUser) return;
+    setIsLoading(true);
 
-    const originalUsers = [...allUsers];
-    setAllUsers((prevUsers) =>
-      prevUsers.map((u) =>
-        u.user_id === editingUser.user_id ? { ...u, ...editFormData } : u
-      )
-    );
-    setIsEditModalOpen(false);
+    if (currentUser) {
+      // Editar usuario
+      const updates = {};
+      if (formData.password) updates.password = formData.password;
+      if (formData.email !== currentUser.email) updates.email = formData.email;
 
-    try {
-      const { error: updateError } = await supabase
-        .from("usuarios")
-        .update({ nombre: editFormData.nombre, rol: editFormData.rol })
-        .eq("user_id", editingUser.user_id);
+      const userMetaDataUpdates = {};
+      if (formData.full_name !== currentUser.full_name)
+        userMetaDataUpdates.full_name = formData.full_name;
 
-      if (updateError) throw updateError;
+      if (
+        Object.keys(updates).length > 0 ||
+        Object.keys(userMetaDataUpdates).length > 0
+      ) {
+        if (Object.keys(userMetaDataUpdates).length > 0) {
+          updates.data = userMetaDataUpdates;
+        }
+        const { error: authUpdateError } =
+          await supabase.auth.admin.updateUserById(currentUser.id, updates);
+        if (authUpdateError) {
+          toast({
+            title: "Error",
+            description: `Error al actualizar datos de autenticación: ${authUpdateError.message}`,
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
 
+      if (
+        formData.role !== currentUser.role ||
+        formData.full_name !== currentUser.full_name
+      ) {
+        const { error: profileUpdateError } = await supabase
+          .from("user_profiles")
+          .update({ role: formData.role, full_name: formData.full_name })
+          .eq("id", currentUser.id);
+
+        if (profileUpdateError) {
+          toast({
+            title: "Error",
+            description: `Error al actualizar perfil: ${profileUpdateError.message}`,
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
       toast({
         title: "Usuario Actualizado",
-        description: `Los datos de ${editFormData.nombre} han sido actualizados.`,
+        description: `El usuario ${formData.email} ha sido actualizado.`,
         variant: "success",
       });
-      fetchAllSystemUsers(); // Re-fetch
-    } catch (e) {
-      console.error("Error updating user:", e);
+    } else {
+      // Crear usuario
+      const { data: newUser, error: createError } =
+        await supabase.auth.admin.createUser({
+          email: formData.email,
+          password: formData.password,
+          email_confirm: true, // O false si quieres enviar email de confirmación
+          user_metadata: { full_name: formData.full_name, role: formData.role },
+        });
+
+      if (createError) {
+        toast({
+          title: "Error",
+          description: `Error al crear usuario: ${createError.message}`,
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // El trigger 'on_auth_user_created' debería crear el perfil.
+      // Si no, se puede insertar aquí explícitamente:
+      // await supabase.from('user_profiles').insert({ id: newUser.user.id, full_name: formData.full_name, role: formData.role });
+
       toast({
-        title: "Error al Actualizar",
-        description: `No se pudo actualizar el usuario. ${e.message}`,
+        title: "Usuario Creado",
+        description: `El usuario ${formData.email} ha sido creado.`,
+        variant: "success",
+      });
+    }
+
+    fetchUsers();
+    resetFormAndClose();
+    setIsLoading(false);
+  };
+
+  const handleDeleteUser = async (userId, userEmail) => {
+    if (
+      !window.confirm(
+        `¿Estás seguro de que quieres eliminar al usuario ${userEmail}? Esta acción no se puede deshacer.`
+      )
+    )
+      return;
+    setIsLoading(true);
+    const { error } = await supabase.auth.admin.deleteUser(userId);
+    if (error) {
+      toast({
+        title: "Error",
+        description: `Error al eliminar usuario: ${error.message}`,
         variant: "destructive",
       });
-      setAllUsers(originalUsers); // Rollback
+    } else {
+      toast({
+        title: "Usuario Eliminado",
+        description: `El usuario ${userEmail} ha sido eliminado.`,
+        variant: "success",
+      });
+      fetchUsers();
     }
-    setEditingUser(null);
+    setIsLoading(false);
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case ROLES.ADMIN:
-      case ROLES.CEO:
-      case ROLES.SUPERVISOR:
-      case ROLES.WORKER:
-      case ROLES.DEVELOPER:
-      case "aceptado":
-        return "text-green-500 bg-green-100/80 dark:bg-green-700/30 dark:text-green-400";
-      case ROLES.PENDING:
-        return "text-yellow-500 bg-yellow-100/80 dark:bg-yellow-700/30 dark:text-yellow-400";
-      case ROLES.REJECTED:
-        return "text-red-500 bg-red-100/80 dark:bg-red-700/30 dark:text-red-400";
-      default:
-        return "text-gray-500 bg-gray-100/80 dark:bg-gray-700/30 dark:text-gray-400";
-    }
-  };
-
-  const getActionIcon = (action) => {
-    if (action === "aceptado") return <CheckSquare className="mr-1 h-4 w-4" />;
-    if (action === "rechazado") return <XSquare className="mr-1 h-4 w-4" />;
-    if (action === "delete") return <Trash2 className="mr-1 h-4 w-4" />;
-    return <ShieldQuestion className="mr-1 h-4 w-4" />;
-  };
-
-  const renderUserTable = (
-    userData,
-    title,
-    showReviewActions = false,
-    showEditDelete = false
-  ) => {
-    if (isLoading && userData.length === 0 && !error) {
-      return (
-        <div className="flex items-center justify-center h-40">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="ml-2 text-muted-foreground">
-            Cargando {title.toLowerCase()}...
-          </p>
+  const columns = [
+    { header: "Nombre Completo", accessor: "full_name", sortable: true },
+    { header: "Email", accessor: "email", sortable: true },
+    { header: "Rol", accessor: "role", sortable: true },
+    { header: "Creado", accessor: "created_at", sortable: true },
+    { header: "Último Acceso", accessor: "last_sign_in_at", sortable: true },
+    {
+      header: "Acciones",
+      accessor: "actions",
+      cell: ({ row }) => (
+        <div className="flex space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openModalForEdit(row)}
+            className="text-primary border-primary hover:bg-primary/10"
+          >
+            <Edit className="h-4 w-4 mr-1" /> Editar
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => handleDeleteUser(row.id, row.email)}
+            disabled={row.id === adminUser?.id}
+          >
+            <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+          </Button>
         </div>
-      );
-    }
-
-    if (userData.length === 0 && !isLoading && !error) {
-      return (
-        <div className="p-6 text-center bg-card border border-border rounded-lg shadow-sm">
-          <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-3" />
-          <h3 className="text-xl font-semibold text-foreground mb-1">
-            Todo en orden
-          </h3>
-          <p className="text-muted-foreground text-sm">
-            No hay {title.toLowerCase()} para mostrar.
-          </p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-        <h2 className="text-xl font-semibold p-4 border-b border-border">
-          {title}
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border">
-            <thead className="bg-muted/50">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  Nombre
-                </th>
-                <th
-                  scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  Email
-                </th>
-                <th
-                  scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  Rol
-                </th>
-                <th
-                  scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  Estado
-                </th>
-                <th
-                  scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  Registrado
-                </th>
-                <th
-                  scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                >
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-card divide-y divide-border">
-              {userData.map((user, index) => (
-                <motion.tr
-                  key={user.user_id || user.id || index}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: index * 0.03 }}
-                  className="hover:bg-muted/30 transition-colors duration-150"
-                >
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">
-                    {user.nombre}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                    {user.email || "N/A"}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground capitalize">
-                    {user.rol_solicitado || user.rol}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(
-                        user.estado
-                      )}`}
-                    >
-                      {user.estado}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                    {user.created_at
-                      ? new Date(user.created_at).toLocaleDateString()
-                      : "N/A"}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium space-x-1">
-                    {adminAuthUser && user.user_id !== adminAuthUser.id && (
-                      <>
-                        {showReviewActions && user.estado === 'pendiente' && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-green-600 hover:text-green-700 hover:bg-green-100/50 dark:hover:bg-green-700/20 h-8 w-8"
-                              onClick={() =>
-                                openConfirmationDialog(user, "aceptado")
-                              }
-                            >
-                              <UserCheck className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-100/50 dark:hover:bg-red-700/20 h-8 w-8"
-                              onClick={() =>
-                                openConfirmationDialog(user, "rechazado")
-                              }
-                            >
-                              <UserX className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                        {showReviewActions &&
-                          user.estado === 'rechazado' && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-100/50 dark:hover:bg-blue-700/20 h-8 w-8"
-                              onClick={() =>
-                                openConfirmationDialog(user, "aceptado")
-                              }
-                            >
-                              <UserCheck className="h-4 w-4" />
-                            </Button>
-                          )}
-                        {showEditDelete && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-100/50 dark:hover:bg-blue-700/20 h-8 w-8"
-                              onClick={() => openEditModal(user)}
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-100/50 dark:hover:bg-red-700/20 h-8 w-8"
-                              onClick={() =>
-                                openConfirmationDialog(user, "borrado")
-                              }
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </>
-                    )}
-                    {adminAuthUser && user.user_id === adminAuthUser.id && (
-                      <span className="text-xs text-muted-foreground italic">
-                        (Tu cuenta)
-                      </span>
-                    )}
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
-
-  if (userAuthLoading) {
-    return (
-      <div className="flex items-center justify-center h-full min-h-[calc(100vh-200px)]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-3 text-xl text-muted-foreground">
-          Cargando gestión de usuarios...
-        </p>
-      </div>
-    );
-  }
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-foreground flex items-center">
-          <Users className="mr-3 h-7 w-7 text-primary" /> Gestión de Cuentas de
-          Usuario
-        </h1>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6 p-1"
+    >
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold text-primary">Gestión de Usuarios</h1>
         <Button
-          onClick={fetchAllSystemUsers}
-          variant="outline"
-          disabled={isLoading}
+          onClick={openModalForCreate}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg flex items-center gap-2"
         >
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-          />
-          Refrescar
+          <UserPlus className="h-5 w-5" />
+          Crear Usuario
         </Button>
       </div>
 
-      {error && !isLoading && (
-        <div className="p-4 bg-red-100 dark:bg-red-700/30 border border-red-300 dark:border-red-600 rounded-lg text-red-700 dark:text-red-300">
-          {error}
-        </div>
-      )}
-
-      {renderUserTable(
-        usersForReview,
-        "Usuarios Pendientes de Revisión",
-        true,
-        false
-      )}
-      {renderUserTable(
-        approvedUsers,
-        "Usuarios Activos y Aprobados",
-        false,
-        true
-      )}
-
-      <AlertDialog
-        open={isConfirmDialogOpen}
-        onOpenChange={setIsConfirmDialogOpen}
+      <Dialog
+        open={isModalOpen}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) resetFormAndClose();
+          else setIsModalOpen(true);
+        }}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center">
-              {getActionIcon(actionType)}
-              Confirmar Acción:{" "}
-              {actionType === "aceptado"
-                ? "Aprobar"
-                : actionType === "rechazado"
-                ? "Rechazar"
-                : actionType === "delete"
-                ? "Eliminar"
-                : ""}{" "}
-              Usuario
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Estás seguro de que quieres{" "}
-              {actionType === "aceptado"
-                ? 'aprobar (cambiar estado a "aceptado")'
-                : actionType === "rechazado"
-                ? 'rechazar (cambiar estado a "rechazado")'
-                : actionType === "delete"
-                ? "eliminar (esta acción puede ser irreversible)"
-                : ""}{" "}
-              al usuario{" "}
-              <span className="font-semibold">
-                {selectedUserForAction?.nombre}
-              </span>{" "}
-              ({selectedUserForAction?.email})?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={closeConfirmationDialog}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={
-                actionType === "delete" ? handleDeleteUser : handleStatusUpdate
-              }
-              className={
-                actionType === "aceptado"
-                  ? "bg-green-600 hover:bg-green-700 text-white"
-                  : actionType === "rechazado" || actionType === "delete"
-                  ? "bg-red-600 hover:bg-red-700 text-white"
-                  : ""
-              }
-            >
-              {actionType === "aceptado"
-                ? "Sí, Aprobar"
-                : actionType === "rechazado"
-                ? "Sí, Rechazar"
-                : actionType === "delete"
-                ? "Sí, Eliminar"
-                : "Confirmar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[525px] bg-card border-border">
           <DialogHeader>
-            <DialogTitle>Editar Usuario</DialogTitle>
+            <DialogTitle className="text-primary text-2xl">
+              {currentUser ? "Editar Usuario" : "Crear Nuevo Usuario"}
+            </DialogTitle>
             <DialogDescription>
-              Modifica los datos del usuario{" "}
-              <span className="font-semibold">{editingUser?.nombre}</span>.
+              {currentUser
+                ? "Modifica los detalles del usuario."
+                : "Completa el formulario para añadir un nuevo usuario al sistema."}
             </DialogDescription>
           </DialogHeader>
-          {editingUser && (
-            <form onSubmit={handleEditSubmit} className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="nombre" className="text-right">
-                  Nombre
-                </Label>
-                <Input
-                  id="nombre"
-                  name="nombre"
-                  value={editFormData.nombre}
-                  onChange={handleEditFormChange}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email" className="text-right">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={editFormData.email}
-                  disabled
-                  className="col-span-3 bg-muted/50"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="rol" className="text-right">
-                  Rol
-                </Label>
-                <Select
-                  name="rol"
-                  value={editFormData.rol}
-                  onValueChange={handleEditFormRoleChange}
+          <form onSubmit={handleSubmit} className="space-y-6 py-4">
+            <div>
+              <Label htmlFor="full_name">Nombre Completo</Label>
+              <Input
+                id="full_name"
+                name="full_name"
+                value={formData.full_name}
+                onChange={handleInputChange}
+                required
+                className="mt-1 bg-background border-input"
+              />
+            </div>
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                required
+                className="mt-1 bg-background border-input"
+              />
+            </div>
+            <div>
+              <Label htmlFor="password">
+                {currentUser ? "Nueva Contraseña (opcional)" : "Contraseña"}
+              </Label>
+              <PasswordInput
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                required={!currentUser}
+                className="mt-1 bg-background border-input"
+              />
+            </div>
+            <div>
+              <Label htmlFor="role">Rol</Label>
+              <Select
+                name="role"
+                value={formData.role}
+                onValueChange={(value) => handleSelectChange("role", value)}
+              >
+                <SelectTrigger
+                  id="role"
+                  className="mt-1 bg-background border-input"
                 >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Selecciona un rol" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.values(ROLES)
-                      .filter(
-                        (role) =>
-                          role !== ROLES.PENDING && role !== ROLES.REJECTED
-                      )
-                      .map((role) => (
-                        <SelectItem
-                          key={role}
-                          value={role}
-                          className="capitalize"
-                        >
-                          {role}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditingUser(null)}
-                  >
-                    Cancelar
-                  </Button>
-                </DialogClose>
-                <Button type="submit">Guardar Cambios</Button>
-              </DialogFooter>
-            </form>
-          )}
+                  <SelectValue placeholder="Selecciona un rol" />
+                </SelectTrigger>
+                <SelectContent>
+                  {USER_ROLES.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={resetFormAndClose}
+                disabled={isLoading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                disabled={isLoading}
+              >
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {currentUser ? "Guardar Cambios" : "Crear Usuario"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
-    </div>
+
+      {isLoading && users.length === 0 ? (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-12 w-12 text-primary animate-spin" />
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={users}
+          searchableColumns={[
+            { accessor: "full_name", header: "Nombre" },
+            { accessor: "email", header: "Email" },
+          ]}
+          filterableColumns={[{ accessor: "role", header: "Rol" }]}
+        />
+      )}
+    </motion.div>
   );
 };
 
-export default UserManagement;
+export default UserManagementPage;

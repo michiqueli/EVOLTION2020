@@ -1,57 +1,101 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, PenLine as FilePenLine, MessageSquare, Briefcase, AlertTriangle, HardHat, Settings2, Library, BarChart3, ShoppingCart, ShieldAlert, ChevronRight, Users, Bell } from 'lucide-react';
-import { useUser, ROLES } from '@/contexts/UserContext';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CalendarDays, PenLine as FilePenLine, MessageSquare, Briefcase, AlertTriangle, Zap, HardHat, Settings2, CheckCircle } from 'lucide-react';
+import { useUser } from '@/contexts/UserContext';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from "@/components/ui/use-toast";
-import DashboardActionCard from '@/components/dashboard/DashboardActionCard';
-import DashboardStatCard from '@/components/dashboard/DashboardStatCard';
 import { supabase } from '@/lib/supabaseClient';
+import { useToast } from "@/components/ui/use-toast";
+
+const ActionCard = ({ title, description, icon: Icon, onClick, bgColor = 'bg-card', textColor = 'text-card-foreground', accentColor = 'text-primary' }) => (
+  <motion.div
+    className={`rounded-xl border border-border ${bgColor} p-6 shadow-lg cursor-pointer h-full flex flex-col justify-between`}
+    whileHover={{ y: -6, boxShadow: "0px 10px 20px hsla(var(--primary-values)/0.2), 0px 3px 8px hsla(var(--primary-values)/0.1)" }}
+    transition={{ type: "spring", stiffness: 300, damping: 15 }}
+    onClick={onClick}
+    initial={{ opacity: 0, y: 30 }}
+    animate={{ opacity: 1, y: 0 }}
+  >
+    <div>
+      <div className={`mb-4 inline-block rounded-lg p-3 bg-primary/10`}>
+        <Icon className={`h-8 w-8 ${accentColor}`} />
+      </div>
+      <h3 className={`mb-2 text-xl font-semibold ${textColor}`}>{title}</h3>
+      <p className={`text-sm text-muted-foreground`}>{description}</p>
+    </div>
+    <Button variant="link" className={`mt-4 p-0 self-start ${accentColor} hover:underline`}>
+      Acceder
+    </Button>
+  </motion.div>
+);
+
+const StatCard = ({ title, value, icon, color, description, hoverColor }) => (
+  <motion.div
+    className={`rounded-xl border border-border bg-card p-6 shadow-lg`}
+    whileHover={{ y: -5, boxShadow: `0 10px 15px -3px ${hoverColor || 'hsl(var(--primary)/0.2)'}, 0 4px 6px -2px ${hoverColor || 'hsl(var(--primary)/0.1)'}` }}
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+  >
+    <div className="flex items-center justify-between">
+      <h3 className="text-lg font-semibold text-card-foreground">{title}</h3>
+      <div className={`rounded-full p-2 ${color}`}>
+        {React.createElement(icon, { className: "h-6 w-6 text-primary-foreground" })}
+      </div>
+    </div>
+    <p className="mt-2 text-3xl font-bold text-primary">{value}</p>
+    {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+  </motion.div>
+);
+
 
 const DashboardPage = () => {
-  const { user } = useUser();
-  const { toast } = useToast();
+  const { user, activeProjectId, activeProjectType, setCurrentActiveProject, clearActiveProject } = useUser();
   const navigate = useNavigate();
-  const [pendingUsersCount, setPendingUsersCount] = useState(0);
-  const [isLoadingPendingCount, setIsLoadingPendingCount] = useState(false);
-
-
-  const isRole = (targetRoles) => {
-    if (!user || !user.role) return false;
-    return Array.isArray(targetRoles) ? targetRoles.includes(user.role) : user.role === targetRoles;
-  };
+  const { toast } = useToast();
+  const isAdminOrCEO = user && (user.role === 'admin' || user.role === 'ceo');
   
-  const fetchPendingUsersCount = useCallback(async () => {
-    if (isRole([ROLES.ADMIN, ROLES.CEO, ROLES.DEVELOPER])) {
-      setIsLoadingPendingCount(true);
-      try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !sessionData.session) {
-          throw new Error(sessionError?.message || "No hay sesión activa.");
-        }
-        const token = sessionData.session.access_token;
-
-        const { data, error } = await supabase.functions.invoke('get-pending-users-count', {
-           headers: { Authorization: `Bearer ${token}` }
-        });
-        if (error) throw error;
-        if (data && typeof data.pending_count === 'number') {
-          setPendingUsersCount(data.pending_count);
-        }
-      } catch (e) {
-        console.error("Error fetching pending users count:", e);
-        // toast({ title: "Error", description: "No se pudo obtener el contador de usuarios pendientes.", variant: "destructive" });
-      } finally {
-        setIsLoadingPendingCount(false);
-      }
-    }
-  }, [user, toast]); // Ensure user is in dependency array for isRole
+  const [projects, setProjects] = useState([]);
+  const [selectedDashboardProject, setSelectedDashboardProject] = useState(activeProjectId || '');
 
   useEffect(() => {
-    fetchPendingUsersCount();
-  }, [fetchPendingUsersCount]);
+    const fetchProjectsForSelect = async () => {
+      const { data, error } = await supabase.from('proyectos').select('uuid_id, nombre, project_type').order('nombre');
+      if (error) {
+        console.error("Error fetching projects for dashboard select:", error);
+      } else {
+        setProjects(data || []);
+        if (activeProjectId && !data.find(p => p.uuid_id === activeProjectId)) {
+          // Active project from context not in list, clear it
+          clearActiveProject();
+          setSelectedDashboardProject('');
+        }
+      }
+    };
+    fetchProjectsForSelect();
+  }, [activeProjectId, clearActiveProject]);
 
+  useEffect(() => {
+    // Sync local select with context if context changes (e.g. from another page)
+    setSelectedDashboardProject(activeProjectId || '');
+  }, [activeProjectId]);
+
+  const handleProjectChange = (projectId) => {
+    setSelectedDashboardProject(projectId);
+    if (projectId) {
+      const project = projects.find(p => p.uuid_id === projectId);
+      if (project) {
+        setCurrentActiveProject(project.uuid_id, project.project_type);
+        toast({ title: "Proyecto Activo Cambiado", description: `Ahora estás trabajando en "${project.nombre}".`, variant: "success", icon: <CheckCircle className="h-5 w-5 text-green-500" /> });
+      }
+    } else {
+      clearActiveProject();
+      toast({ title: "Proyecto Activo Eliminado", description: "No hay ningún proyecto activo seleccionado.", variant: "info" });
+    }
+  };
 
   const actionCardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -59,196 +103,128 @@ const DashboardPage = () => {
       opacity: 1,
       y: 0,
       transition: {
-        delay: i * 0.1, 
-        duration: 0.4,
+        delay: i * 0.15,
+        duration: 0.5,
         ease: "easeOut"
       }
     })
   };
   
-  const actionCardsConfig = [
-    { 
-      title: "Ver Planificación Diaria", 
-      description: "Consulta tareas, vehículos y materiales asignados.", 
-      icon: CalendarDays, 
-      onClick: () => navigate('/planning'),
-      roles: [ROLES.WORKER, ROLES.SUPERVISOR, ROLES.CEO, ROLES.ADMIN, ROLES.DEVELOPER]
-    },
-    { 
-      title: "Crear Informe Diario", 
-      description: "Registra actividades, avances e incidencias.", 
-      icon: FilePenLine, 
-      onClick: () => navigate('/activities?action=new'),
-      roles: [ROLES.WORKER, ROLES.SUPERVISOR] 
-    },
-    { 
-      title: "Chat con ChatEVO", 
-      description: "Asistente IA para dudas y optimización de tareas.", 
-      icon: MessageSquare, 
-      onClick: () => navigate('/assistant'),
-      roles: [ROLES.WORKER, ROLES.SUPERVISOR, ROLES.CEO, ROLES.ADMIN, ROLES.DEVELOPER]
-    },
-    { 
-      title: "Gestionar Proyectos", 
-      description: "Crear, editar y administrar proyectos.", 
-      icon: Briefcase, 
-      onClick: () => navigate('/projects'),
-      roles: [ROLES.CEO, ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.DEVELOPER]
-    },
-    { 
-      title: "Ver Proyectos Asignados", 
-      description: "Consulta información y documentación de tus proyectos.", 
-      icon: Briefcase, 
-      onClick: () => navigate('/projects'), 
-      roles: [ROLES.WORKER] 
-    },
-    { 
-      title: "Biblioteca de Recursos", 
-      description: "Accede a manuales, planos y documentación técnica.", 
-      icon: Library, 
-      onClick: () => navigate('/library'),
-      roles: [ROLES.WORKER, ROLES.SUPERVISOR, ROLES.CEO, ROLES.ADMIN, ROLES.DEVELOPER]
-    },
-    { 
-      title: "Generar Reportes Analíticos", 
-      description: "Analiza rendimiento, costes y avances.", 
-      icon: BarChart3, 
-      onClick: () => navigate('/reports'),
-      roles: [ROLES.CEO, ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.DEVELOPER]
-    },
-    {
-      title: "Revisar Informes de Equipo",
-      description: "Aprueba o edita los informes diarios de tus técnicos.",
-      icon: FilePenLine,
-      onClick: () => navigate('/activities?view=team'), 
-      roles: [ROLES.SUPERVISOR]
-    },
-    {
-      title: "Gestión de Usuarios",
-      description: "Administrar altas, bajas y roles de usuarios.",
-      icon: Users,
-      onClick: () => navigate('/admin/users'),
-      roles: [ROLES.ADMIN, ROLES.CEO, ROLES.DEVELOPER],
-      badge: pendingUsersCount > 0 ? pendingUsersCount.toString() : null,
-      badgeColor: 'bg-yellow-500 text-white',
-    }
-  ];
-
-  const visibleActionCards = actionCardsConfig.filter(card => isRole(card.roles));
-
-  const upcomingFeaturesConfig = [
-     { 
-      title: "Solicitar Compra", 
-      icon: ShoppingCart, 
-      onClick: () => toast({ title: "Próximamente", description: "Funcionalidad de Solicitud de Compra estará disponible pronto."}),
-      roles: [ROLES.WORKER, ROLES.SUPERVISOR]
-    },
-    { 
-      title: "Reportar Incidente", 
-      icon: ShieldAlert, 
-      onClick: () => toast({ title: "Próximamente", description: "Funcionalidad de Reporte de Incidente estará disponible pronto."}),
-      roles: [ROLES.WORKER, ROLES.SUPERVISOR]
-    },
-  ];
-
-  const visibleUpcomingFeatures = upcomingFeaturesConfig.filter(feature => isRole(feature.roles));
-
   return (
-    <div className="space-y-8 p-2 md:p-4">
+    <div className="space-y-10 p-2">
       <motion.div 
-        className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6"
+        className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
+          <h1 className="text-4xl font-bold tracking-tight text-foreground">
             ¡Hola, <span className="text-primary">{user?.name ? user.name.split(' ')[0] : 'Usuario'}</span>!
           </h1>
-          <p className="text-md md:text-lg text-muted-foreground mt-1">Bienvenido de nuevo a EVOLTION2020.</p>
+          <p className="text-lg text-muted-foreground mt-1">Bienvenido de nuevo a EVOLTION2020.</p>
         </div>
-        {user && <span className="text-sm md:text-md text-muted-foreground self-start md:self-center mt-2 md:mt-0 capitalize bg-secondary px-2 py-1 rounded">Rol: {user.role}</span>}
+        {user && <span className="text-md text-muted-foreground self-start md:self-center mt-2 md:mt-0 capitalize">Tu rol: {user.role}</span>}
       </motion.div>
-      
-      {isRole([ROLES.ADMIN, ROLES.CEO, ROLES.DEVELOPER]) && pendingUsersCount > 0 && !isLoadingPendingCount && (
-         <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-4 mb-6 bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 text-white rounded-lg shadow-lg flex items-center justify-between cursor-pointer hover:from-yellow-500 hover:to-orange-600 transition-all"
-            onClick={() => navigate('/admin/users')}
-          >
-            <div className="flex items-center">
-              <Bell className="h-6 w-6 mr-3 animate-pulse" />
-              <p className="font-semibold text-lg">
-                Hay {pendingUsersCount} nuevo{pendingUsersCount > 1 ? 's' : ''} usuario{pendingUsersCount > 1 ? 's' : ''} pendiente{pendingUsersCount > 1 ? 's' : ''} de aprobación.
-              </p>
-            </div>
-            <ChevronRight className="h-6 w-6" />
-        </motion.div>
-      )}
 
-
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {visibleActionCards.map((card, index) => (
-           <motion.div
-            key={card.title}
-            variants={actionCardVariants}
-            initial="hidden"
-            animate="visible"
-            custom={index}
-            className="h-full" 
-          >
-            <DashboardActionCard
-              title={card.title}
-              description={card.description}
-              icon={card.icon}
-              onClick={card.onClick}
-              className="flex flex-col h-full"
-              badge={card.badge}
-              badgeColor={card.badgeColor}
-            />
-          </motion.div>
-        ))}
-      </div>
-      
-      {visibleUpcomingFeatures.length > 0 && (
+      {/* Project Selector for Technicians/Workers */}
+      {user && (user.role === 'TECNICO' || user.role === 'worker') && (
         <motion.div 
-          className="mt-10"
+          className="p-4 border rounded-lg bg-card shadow-md"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: visibleActionCards.length * 0.1 }}
+          transition={{ delay: 0.1 }}
         >
-          <h2 className="text-2xl font-semibold text-foreground mb-3 flex items-center">
-            <ChevronRight className="h-6 w-6 text-primary mr-1"/> Próximamente...
-          </h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {visibleUpcomingFeatures.map((feature) => (
-              <Button 
-                key={feature.title} 
-                variant="outline" 
-                className="justify-start p-4 h-auto border-dashed hover:border-primary hover:bg-primary/5 group transition-all"
-                onClick={feature.onClick}
-              >
-                <feature.icon className="h-7 w-7 text-primary/70 mr-3 group-hover:text-primary transition-colors" />
-                <div>
-                  <p className="font-medium text-foreground text-left">{feature.title}</p>
-                  <p className="text-xs text-muted-foreground text-left">Esta función estará disponible pronto.</p>
-                </div>
-              </Button>
-            ))}
+          <Label htmlFor="active-project-select" className="text-lg font-medium text-foreground">Proyecto Activo Actual:</Label>
+          <div className="flex items-center gap-3 mt-2">
+            <Select onValueChange={handleProjectChange} value={selectedDashboardProject}>
+              <SelectTrigger id="active-project-select" className="flex-grow bg-background border-input">
+                <SelectValue placeholder="Selecciona tu proyecto activo..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Ninguno (Borrar selección)</SelectItem>
+                {projects.map(p => (
+                  <SelectItem key={p.uuid_id} value={p.uuid_id}>{p.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {activeProjectId && <CheckCircle className="h-6 w-6 text-green-500 shrink-0" title={`Proyecto activo: ${projects.find(p=>p.uuid_id === activeProjectId)?.nombre || ''}`} />}
           </div>
+          {activeProjectId && activeProjectType && (
+            <p className="text-xs text-muted-foreground mt-1">Tipo de proyecto activo: {activeProjectType}</p>
+          )}
         </motion.div>
       )}
 
-      <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        <DashboardStatCard
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <motion.custom
+          variants={actionCardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={0}
+        >
+          <ActionCard
+            title="Planificación del Día"
+            description="Consulta tu proyecto, vehículo, materiales y tareas asignadas para hoy."
+            icon={CalendarDays}
+            onClick={() => navigate('/activities')}
+          />
+        </motion.custom>
+        <motion.custom
+          variants={actionCardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={1}
+        >
+          <ActionCard
+            title="Crear Informe Diario"
+            description="Registra tus actividades, avances e incidencias de la jornada laboral."
+            icon={FilePenLine}
+            onClick={() => navigate('/activities?action=new')}
+          />
+        </motion.custom>
+        <motion.custom
+          variants={actionCardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={2}
+        >
+          <ActionCard
+            title="Chat con ChatEVO"
+            description="Tu asistente IA para resolver dudas, buscar documentos y optimizar tareas."
+            icon={MessageSquare}
+            onClick={() => navigate('/assistant')}
+          />
+        </motion.custom>
+      </div>
+      
+      <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+         <StatCard
+          title="Proyectos Activos"
+          value={isAdminOrCEO ? "12" : (activeProjectId ? "1" : "0")}
+          icon={Briefcase}
+          color="bg-primary" 
+          hoverColor="hsl(var(--primary)/0.3)"
+          description={isAdminOrCEO ? "+2 esta semana" : (activeProjectId ? "Asignado a ti" : "Selecciona un proyecto")}
+        />
+        {isAdminOrCEO && (
+          <StatCard
             title="Alertas Críticas"
-            value={isRole([ROLES.CEO, ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.DEVELOPER]) ? "3" : "0"}
+            value="3"
             icon={AlertTriangle}
             color="bg-destructive"
             hoverColor="hsl(var(--destructive)/0.3)"
             description="Requieren atención inmediata"
-            isVisible={isRole([ROLES.CEO, ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.DEVELOPER])}
+          />
+        )}
+        <StatCard
+          title="Tareas Completadas Hoy"
+          value="27"
+          icon={Zap}
+          color="bg-green-500"
+          hoverColor="hsla(140, 70%, 40%, 0.3)"
+          description="¡Buen trabajo equipo!"
         />
       </div>
       
@@ -256,12 +232,9 @@ const DashboardPage = () => {
         className="mt-10 rounded-xl border border-border bg-card p-6 shadow-lg"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: (visibleActionCards.length * 0.1) + 0.2 }}
-        style={{ display: isRole([ROLES.CEO, ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.DEVELOPER]) ? 'block' : 'none' }} 
+        transition={{ duration: 0.5, delay: 0.4 }}
       >
-        <h2 className="text-2xl font-semibold text-card-foreground mb-4">
-          {isRole([ROLES.CEO, ROLES.ADMIN, ROLES.DEVELOPER]) ? "Actividad Reciente General" : "Actividad Reciente del Equipo"}
-        </h2>
+        <h2 className="text-2xl font-semibold text-card-foreground mb-4">Actividad Reciente del Equipo</h2>
         <ul className="space-y-3">
           <li className="flex items-center justify-between p-3 bg-secondary/50 rounded-md hover:bg-secondary transition-colors">
             <div>
@@ -280,7 +253,7 @@ const DashboardPage = () => {
         </ul>
       </motion.div>
 
-      {isRole(ROLES.WORKER) && (
+      {user && (user.role === 'worker' || user.role === 'TECNICO') && (
          <motion.div
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -291,14 +264,14 @@ const DashboardPage = () => {
             size="lg"
             className="rounded-full shadow-2xl bg-primary text-primary-foreground hover:bg-primary/90 w-16 h-16 p-0 flex items-center justify-center"
             title="Activar Modo Obra (Simplificado)"
-            onClick={() => toast({ title: "Modo Obra", description: "Interfaz simplificada activada (conceptual)."})}
+            onClick={() => console.log("Modo Obra Activado (Conceptual)")}
           >
             <HardHat className="h-7 w-7" />
           </Button>
         </motion.div>
       )}
 
-      {isRole([ROLES.CEO, ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.DEVELOPER]) && ( 
+      {isAdminOrCEO && (
          <motion.div
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -308,19 +281,15 @@ const DashboardPage = () => {
           <Button
             size="lg"
             className="rounded-full shadow-2xl bg-secondary text-secondary-foreground hover:bg-secondary/80 w-16 h-16 p-0 flex items-center justify-center"
-            title={isRole([ROLES.CEO, ROLES.ADMIN, ROLES.DEVELOPER]) ? "Configuración Global" : "Ajustes de Supervisor"}
-            onClick={() => {
-              if (isRole([ROLES.CEO, ROLES.ADMIN, ROLES.DEVELOPER])) {
-                navigate('/admin/settings');
-              } else {
-                 toast({ title: "Ajustes de Supervisor", description: "Página de ajustes para supervisores (conceptual)."});
-              }
-            }}
+            title="Configuración Avanzada"
+            onClick={() => console.log("Configuración Avanzada (Conceptual)")}
           >
             <Settings2 className="h-7 w-7" />
           </Button>
         </motion.div>
       )}
+
+
     </div>
   );
 };

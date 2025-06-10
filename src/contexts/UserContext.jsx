@@ -13,12 +13,12 @@ export const ROLES = {
 };
 
 const MOCKED_USER = {
-  id: 'mocked_user_id_supabase',
-  supabase_id: 'mocked_user_id_supabase',
-  db_id: 'mocked_user_id_db',
+  id: '1393925d-655f-4c09-b82d-4c8aa2b196bb',
+  supabase_id: '1393925d-655f-4c09-b82d-4c8aa2b196bb',
+  db_id: '1393925d-655f-4c09-b82d-4c8aa2b196bb',
   name: 'Usuario Simulado',
   role: ROLES.ADMIN, 
-  email: 'mock@example.com',
+  email: 'admin@evoltion.com',
   avatarUrl: 'https://i.pravatar.cc/150?u=mocked_user',
   estado: 'aceptado',
 };

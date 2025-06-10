@@ -23,7 +23,7 @@ const PlanningGridCell = React.memo(
     employeesList,
   }) => {
     return (
-      <div className="flex-grow flex flex-col space-y-1 overflow-hidden p-1">
+      <div className="flex-grow flex flex-col space-y-1 overflow-hidden p-1 h-full">
         {tasks.map((task) => (
           <AssignedTaskItem
             key={task.instanceId}
@@ -97,8 +97,6 @@ export const PlanningGrid = React.memo(
     if (isMonthView) {
         const dayHeaders = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
         
-        // CAMBIO: Se verifica explícitamente el largo del array en lugar de la existencia de `employees[0]`.
-        // Esto es más claro y robusto.
         if (employees.length === 0) {
             gridContent = (
                 <div className="flex justify-center items-center h-64 text-muted-foreground text-lg">
@@ -106,7 +104,6 @@ export const PlanningGrid = React.memo(
                 </div>
             );
         } else {
-            // Ahora que sabemos que el empleado existe, lo asignamos.
             const employee = employees[0];
             gridContent = (
                 <div className="flex flex-col border-t border-l border-border rounded-lg bg-card shadow-inner overflow-hidden">
