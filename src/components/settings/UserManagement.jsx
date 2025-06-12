@@ -48,8 +48,8 @@ const UserManagementPage = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    full_name: "",
-    role: "TECNICO",
+    nombre: "",
+    rol: "TECNICO",
   });
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -89,12 +89,11 @@ const UserManagementPage = () => {
 
     const combinedUsers = authUsers.users.map((authUser) => {
       const profile = profiles?.find((p) => p.user_id === authUser.id);
-      console.log(profile)
+      console.log(profile);
       return {
         id: authUser.id,
         email: authUser.email,
-        full_name:
-          profile?.nombre || authUser.user_metadata?.full_name || "N/A",
+        nombre: profile?.nombre || authUser.user_metadata?.full_name || "N/A",
         role: profile?.rol || "N/A",
         created_at: new Date(authUser.created_at).toLocaleDateString(),
         last_sign_in_at: authUser.last_sign_in_at
@@ -122,14 +121,14 @@ const UserManagementPage = () => {
   };
 
   const resetFormAndClose = () => {
-    setFormData({ email: "", password: "", full_name: "", role: "TECNICO" });
+    setFormData({ email: "", password: "", nombre: "", rol: "TECNICO" });
     setCurrentUser(null);
     setIsModalOpen(false);
   };
 
   const openModalForCreate = () => {
     setCurrentUser(null);
-    setFormData({ email: "", password: "", full_name: "", role: "TECNICO" });
+    setFormData({ email: "", password: "", nombre: "", rol: "TECNICO" });
     setIsModalOpen(true);
   };
 
@@ -138,8 +137,8 @@ const UserManagementPage = () => {
     setFormData({
       email: userToEdit.email,
       password: "",
-      full_name: userToEdit.full_name,
-      role: userToEdit.role,
+      nombre: userToEdit.nombre,
+      rol: userToEdit.role,
     });
     setIsModalOpen(true);
   };
@@ -150,13 +149,14 @@ const UserManagementPage = () => {
 
     if (currentUser) {
       // Editar usuario
-      const updates = {};
-      if (formData.password) updates.password = formData.password;
-      if (formData.email !== currentUser.email) updates.email = formData.email;
+      const authUpdates = {};
+      if (formData.password) authUpdates.password = formData.password;
+      if (formData.email !== currentUser.email)
+        authUpdates.email = formData.email;
 
       const userMetaDataUpdates = {};
-      if (formData.full_name !== currentUser.full_name)
-        userMetaDataUpdates.full_name = formData.full_name;
+      if (formData.nombre !== currentUser.nombre)
+        userMetaDataUpdates.full_name = formData.nombre;
 
       if (
         Object.keys(updates).length > 0 ||
@@ -179,12 +179,12 @@ const UserManagementPage = () => {
       }
 
       if (
-        formData.role !== currentUser.role ||
-        formData.full_name !== currentUser.full_name
+        formData.rol !== currentUser.rol ||
+        formData.nombre !== currentUser.nombre
       ) {
         const { error: profileUpdateError } = await supabase
-          .from("user_profiles")
-          .update({ role: formData.role, full_name: formData.full_name })
+          .from("usuarios")
+          .update({ rol: formData.rol, nombre: formData.nombre })
           .eq("id", currentUser.id);
 
         if (profileUpdateError) {
@@ -209,7 +209,7 @@ const UserManagementPage = () => {
           email: formData.email,
           password: formData.password,
           email_confirm: true, // O false si quieres enviar email de confirmación
-          user_metadata: { full_name: formData.full_name, role: formData.role },
+          user_metadata: { full_name: formData.nombre, role: formData.rol },
         });
 
       if (createError) {
@@ -265,7 +265,7 @@ const UserManagementPage = () => {
   };
 
   const columns = [
-    { header: "Nombre Completo", accessor: "full_name", sortable: true },
+    { header: "Nombre Completo", accessor: "nombre", sortable: true },
     { header: "Email", accessor: "email", sortable: true },
     { header: "Rol", accessor: "role", sortable: true },
     { header: "Creado", accessor: "created_at", sortable: true },
@@ -336,9 +336,9 @@ const UserManagementPage = () => {
             <div>
               <Label htmlFor="full_name">Nombre Completo</Label>
               <Input
-                id="full_name"
-                name="full_name"
-                value={formData.full_name}
+                id="nombre"
+                name="nombre"
+                value={formData.nombre}
                 onChange={handleInputChange}
                 required
                 className="mt-1 bg-background border-input"
@@ -422,7 +422,7 @@ const UserManagementPage = () => {
           columns={columns}
           data={users}
           searchableColumns={[
-            { accessor: "full_name", header: "Nombre" },
+            { accessor: "nombre", header: "Nombre" },
             { accessor: "email", header: "Email" },
           ]}
           filterableColumns={[{ accessor: "role", header: "Rol" }]}

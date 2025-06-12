@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import Sidebar from '@/components/Sidebar';
-import { Toaster } from '@/components/ui/toaster';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,7 +20,6 @@ const Layout = ({ children }) => {
       if (window.innerWidth >= 768) {
         setIsSidebarOpen(true);
       } else {
-         // Keep sidebar closed on small screens unless explicitly opened
       }
     };
     handleResize();
@@ -30,7 +28,7 @@ const Layout = ({ children }) => {
   }, []);
 
   if (!user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return (
@@ -45,7 +43,7 @@ const Layout = ({ children }) => {
             <h1 className="ml-2 text-xl font-semibold text-primary md:hidden">EVOLTION2020</h1>
           </div>
           <div className="flex items-center space-x-4">
-            {user && <span className="text-sm text-muted-foreground hidden md:inline capitalize">Rol: {user.role}</span>}
+            {user && <span className="text-sm text-muted-foreground hidden md:inline capitalize">Rol: {user.rol}</span>}
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-6">
@@ -62,7 +60,6 @@ const Layout = ({ children }) => {
           </AnimatePresence>
         </main>
       </div>
-      <Toaster />
     </div>
   );
 };

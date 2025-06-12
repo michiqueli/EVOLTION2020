@@ -120,15 +120,15 @@ const DashboardPage = () => {
       >
         <div>
           <h1 className="text-4xl font-bold tracking-tight text-foreground">
-            ¡Hola, <span className="text-primary">{user?.name ? user.name.split(' ')[0] : 'Usuario'}</span>!
+            ¡Hola, <span className="text-primary">{user?.nombre ? user.nombre.split(' ')[0] : 'Usuario'}</span>!
           </h1>
           <p className="text-lg text-muted-foreground mt-1">Bienvenido de nuevo a EVOLTION2020.</p>
         </div>
-        {user && <span className="text-md text-muted-foreground self-start md:self-center mt-2 md:mt-0 capitalize">Tu rol: {user.role}</span>}
+        {user && <span className="text-md text-muted-foreground self-start md:self-center mt-2 md:mt-0 capitalize">Tu rol: {user.rol}</span>}
       </motion.div>
 
       {/* Project Selector for Technicians/Workers */}
-      {user && (user.role === 'TECNICO' || user.role === 'worker') && (
+      {user && (user.rol === 'TECNICO' || user.role === 'worker') && (
         <motion.div 
           className="p-4 border rounded-lg bg-card shadow-md"
           initial={{ opacity: 0, y: 20 }}
@@ -168,7 +168,7 @@ const DashboardPage = () => {
             title="Planificación del Día"
             description="Consulta tu proyecto, vehículo, materiales y tareas asignadas para hoy."
             icon={CalendarDays}
-            onClick={() => navigate('/activities')}
+            onClick={() => navigate('/planning')}
           />
         </motion.custom>
         <motion.custom

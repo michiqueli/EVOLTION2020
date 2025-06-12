@@ -30,7 +30,7 @@ const TimeTrackingPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTimer, setActiveTimer] = useState(null); // Stores ID of active entry
   const { toast } = useToast();
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'CEO';
+  const isAdmin = user?.rol === 'ADMIN' || user?.rol === 'CEO' || user?.rol === 'DESARROLLADOR';
 
   const fetchTimeEntries = useCallback(async () => {
     setIsLoading(true);
@@ -59,7 +59,7 @@ const TimeTrackingPage = () => {
   }, [toast, isAdmin, user?.id]);
 
   const fetchProjects = useCallback(async () => {
-    const { data, error } = await supabase.from('proyectos').select('uuid_id, nombre').order('nombre');
+    const { data, error } = await supabase.from('proyectos').select('id, nombre').order('nombre');
     if (error) {
       toast({ title: "Error", description: "No se pudieron cargar los proyectos.", variant: "destructive" });
     } else {
@@ -107,7 +107,7 @@ const TimeTrackingPage = () => {
   const openModalForEdit = (entry) => {
     setCurrentEntry(entry);
     setFormData({
-      project_id: entry.project_id || (entry.is_other_project ? 'OTROS' : ''),
+      projecto_id: entry.project_id || (entry.is_other_project ? 'OTROS' : ''),
       date: entry.date,
       start_time: entry.start_time ? new Date(entry.start_time).toISOString().substring(0, 16) : '',
       end_time: entry.end_time ? new Date(entry.end_time).toISOString().substring(0, 16) : '',
@@ -124,7 +124,7 @@ const TimeTrackingPage = () => {
 
     const dataToSave = {
       user_id: currentEntry ? currentEntry.user_id : user.id, // Admin can edit others
-      project_id: formData.project_id === 'OTROS' || formData.is_other_project ? null : formData.project_id,
+      projecto_id: formData.projecto_id === 'OTROS' || formData.is_other_project ? null : formData.projecto_id,
       date: formData.date,
       start_time: new Date(formData.start_time).toISOString(),
       end_time: formData.end_time ? new Date(formData.end_time).toISOString() : null,

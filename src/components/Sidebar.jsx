@@ -6,7 +6,6 @@ import {
   Briefcase,
   ListChecks,
   BarChart2,
-  ShieldCheck,
   LogOut,
   Menu,
   X,
@@ -104,25 +103,25 @@ const sidebarConfig = [
     type: "group",
     label: "RR HH",
     icon: UsersIcon,
-    roles: [ROLES.ADMIN, ROLES.CEO, ROLES.SUPERVISOR],
+    roles: [ROLES.ADMIN, ROLES.CEO, ROLES.SUPERVISOR, ROLES.DEVELOPER],
     subItems: [
       {
         to: "/hr/resources",
         label: "Gestión de recursos",
         icon: UsersIcon,
-        roles: [ROLES.ADMIN, ROLES.CEO, ROLES.SUPERVISOR],
+        roles: [ROLES.ADMIN, ROLES.CEO, ROLES.SUPERVISOR, ROLES.DEVELOPER],
       },
       {
         to: "/hr/time-tracking",
         label: "Control Horario",
         icon: Clock,
-        roles: [ROLES.ADMIN, ROLES.CEO, ROLES.SUPERVISOR],
+        roles: [ROLES.ADMIN, ROLES.CEO, ROLES.SUPERVISOR, ROLES.DEVELOPER],
       },
       {
         to: "/hr/absences",
         label: "Gestión de Ausencias",
         icon: UserMinus,
-        roles: [ROLES.ADMIN, ROLES.CEO, ROLES.SUPERVISOR],
+        roles: [ROLES.ADMIN, ROLES.CEO, ROLES.SUPERVISOR, ROLES.DEVELOPER],
       },
     ],
   },
@@ -138,21 +137,21 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const { user, logout } = useUser();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login", { replace: true });
   };
 
   // 2. LÓGICA DE FILTRADO ACTUALIZADA PARA LA ESTRUCTURA ANIDADA
   const getVisibleItems = () => {
-    if (!user || !user.role) return [];
+    if (!user || !user.rol) return [];
 
     return sidebarConfig.reduce((acc, item) => {
       // Si es un grupo de acordeón
       if (item.type === "group") {
         // Filtra los sub-items que el usuario puede ver
         const visibleSubItems = item.subItems.filter((subItem) =>
-          subItem.roles.includes(user.role)
+          subItem.roles.includes(user.rol)
         );
         // Si hay al menos un sub-item visible, añade el grupo al menú
         if (visibleSubItems.length > 0) {
@@ -160,7 +159,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         }
       } else {
         // Si es un enlace normal, comprueba los roles
-        if (item.roles.includes(user.role)) {
+        if (item.roles.includes(user.rol)) {
           acc.push(item);
         }
       }
@@ -172,7 +171,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
   const sidebarVariants = {
     open: {
-      width: "16rem",
+      width: "18rem",
       transition: { type: "spring", stiffness: 300, damping: 30 },
     },
     closed: {
@@ -362,10 +361,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     className="ml-3 flex flex-col items-start overflow-hidden whitespace-nowrap"
                   >
                     <span className="text-sm font-medium text-foreground">
-                      {user.name || user.email}
+                      {user.nombre || user.email}
                     </span>
                     <span className="text-xs text-muted-foreground capitalize">
-                      {user.role}
+                      {user.rol}
                     </span>
                   </motion.div>
                 )}
@@ -389,9 +388,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 <span>Perfil</span>
               </NavLink>
             </DropdownMenuItem>
-            {(user.role === ROLES.ADMIN ||
-              user.role === ROLES.CEO ||
-              user.role === ROLES.DEVELOPER) && (
+            {(user.rol === ROLES.ADMIN ||
+              user.rol === ROLES.CEO ||
+              user.rol === ROLES.DEVELOPER) && (
               <DropdownMenuItem
                 className="cursor-pointer w-full"
                 onClick={() => navigate("/admin/settings")}
