@@ -28,7 +28,7 @@ const ProjectCard = ({ project, onUpdateStatus, onEdit, onDelete, onViewDetails 
   const { user } = useUser();
   const statusStyle = getStatusStyles(project.estado);
 
-  const canManage = user && (user.role === ROLES.CEO || user.role === ROLES.ADMIN || user.role === ROLES.SUPERVISOR);
+  const canManage = user && (user.role === ROLES.CEO || user.role === ROLES.ADMIN || user.role === ROLES.SUPERVISOR || user.role === ROLES.DEVELOPER);
   const isTechnician = user && user.role === ROLES.WORKER;
 
   const handleCardClick = () => {

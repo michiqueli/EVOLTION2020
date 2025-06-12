@@ -30,7 +30,7 @@ const ProjectsPage = () => {
   const [currentProjectData, setCurrentProjectData] = useState(initialNewProjectState);
   const { toast } = useToast();
   
-  const canManageProjects = user && (user.role === ROLES.CEO || user.role === ROLES.ADMIN || user.role === ROLES.SUPERVISOR);
+  const canManageProjects = user && (user.role === ROLES.CEO || user.role === ROLES.ADMIN || user.role === ROLES.SUPERVISOR || user.role === ROLES.DEVELOPER);
   const isTechnician = user && user.role === ROLES.WORKER;
 
   const fetchProjects = async () => {
