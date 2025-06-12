@@ -17,9 +17,29 @@ export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  // --- NUEVO ESTADO PARA ERRORES DE LÓGICA ---
   const [authError, setAuthError] = useState(null);
+  const [activeProjectId, setActiveProjectId] = useState(() => {
+    return localStorage.getItem("activeProjectId");
+  });
+  const [activeProjectType, setActiveProjectType] = useState(() => {
+    return localStorage.getItem("activeProjectType");
+  });
 
+  useEffect(() => {
+    if (activeProjectId) {
+      localStorage.setItem("activeProjectId", activeProjectId);
+    } else {
+      localStorage.removeItem("activeProjectId");
+    }
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    if (activeProjectType) {
+      localStorage.setItem("activeProjectType", activeProjectType);
+    } else {
+      localStorage.removeItem("activeProjectType");
+    }
+  }, [activeProjectType]);
   // --- PRIMER useEffect: Sincroniza la sesión con Supabase ---
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -38,7 +58,6 @@ export const UserProvider = ({ children }) => {
 
   // --- SEGUNDO useEffect: Reacciona a la sesión para obtener y validar el perfil ---
   useEffect(() => {
-    // Limpiamos errores anteriores al iniciar un nuevo chequeo
     setAuthError(null);
 
     if (session) {
@@ -83,6 +102,15 @@ export const UserProvider = ({ children }) => {
       setUser(null);
     }
   }, [session]);
+  
+  useEffect(() => {
+    if (!user) {
+      localStorage.removeItem("activeProjectId");
+      localStorage.removeItem("activeProjectType");
+      setActiveProjectId(null);
+      setActiveProjectType(null);
+    }
+  }, [user]);
 
   // La función de login es ahora MUY simple
   const login = async ({ email, password }) => {
@@ -97,14 +125,27 @@ export const UserProvider = ({ children }) => {
     setAuthError(null);
   };
 
+  const setCurrentActiveProject = (projectId, projectType) => {
+    setActiveProjectId(projectId);
+    setActiveProjectType(projectType);
+  };
+
+  const clearActiveProject = () => {
+    setActiveProjectId(null);
+    setActiveProjectType(null);
+  };
+
   const value = {
     user,
     loadingAuth,
-    authError, // Exponemos el nuevo estado de error
-    clearAuthError, // Y la función para limpiarlo
+    authError,
+    clearAuthError,
     login,
     logout,
     ROLES,
+    clearActiveProject,
+    setCurrentActiveProject,
+    activeProjectId
   };
 
   return (
