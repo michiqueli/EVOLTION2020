@@ -101,11 +101,10 @@ const TimeTrackingPage = () => {
     setIsLoading(false);
   }, [toast, isAdmin, user?.id]);
 
-  // CORREGIDO: Se asegura de obtener el uuid_id de los proyectos
   const fetchProjects = useCallback(async () => {
     const { data, error } = await supabase
       .from("proyectos")
-      .select("id, uuid_id, nombre") // <-- Se trae el uuid_id
+      .select("id, uuid_id, nombre")
       .order("nombre");
     if (error) {
       toast({
@@ -130,8 +129,8 @@ const TimeTrackingPage = () => {
     } else {
       setIsOtherProject(false);
       setOtherProjectDetails("");
-      setCurrentActiveProject(projectId); // projectId ya es uuid_id
-      const project = projects.find((p) => p.uuid_id === projectId); // Búsqueda por uuid_id
+      setCurrentActiveProject(projectId);
+      const project = projects.find((p) => p.uuid_id === projectId);
       if (project) {
         toast({
           title: "Proyecto Activo Cambiado",
@@ -140,6 +139,19 @@ const TimeTrackingPage = () => {
         });
       }
     }
+  };
+
+  // --- FUNCIÓN AUXILIAR para convertir fechas a formato local ---
+  const toLocalISOString = (dateString) => {
+    if (!dateString) return "";
+
+    const date = new Date(dateString);
+    const tzoffset = new Date().getTimezoneOffset() * 60000; //offset in milliseconds
+    const localISOTime = new Date(date.getTime() - tzoffset)
+      .toISOString()
+      .slice(0, 16);
+
+    return localISOTime;
   };
 
   const handleStartTimer = async () => {
@@ -166,7 +178,7 @@ const TimeTrackingPage = () => {
       .from("time_tracking")
       .insert({
         user_id: user.id,
-        project_id: isOtherProject ? null : activeProjectId, // activeProjectId ya es uuid_id
+        project_id: isOtherProject ? null : activeProjectId,
         date: new Date().toISOString().split("T")[0],
         start_time: new Date().toISOString(),
         is_other_project: isOtherProject,
@@ -258,7 +270,7 @@ const TimeTrackingPage = () => {
         }
 
         const currentHours = projectData.horas;
-        const newHours = currentHours - durationInHours;
+        const newHours = currentHours + durationInHours;
 
         // Finalmente, actualizamos el proyecto con el nuevo total de horas
         const { error: updateProjectError } = await supabase
@@ -334,14 +346,10 @@ const TimeTrackingPage = () => {
   const openModalForEdit = (entry) => {
     setCurrentEntry(entry);
     setModalFormData({
-      project_id: entry.project_id || (entry.is_other_project ? "OTROS" : ""), // project_id ya es uuid_id
+      project_id: entry.project_id || (entry.is_other_project ? "OTROS" : ""),
       date: entry.date,
-      start_time: entry.start_time
-        ? new Date(entry.start_time).toISOString().substring(0, 16)
-        : "",
-      end_time: entry.end_time
-        ? new Date(entry.end_time).toISOString().substring(0, 16)
-        : "",
+      start_time: entry.start_time ? toLocalISOString(entry.start_time) : "",
+      end_time: entry.end_time ? toLocalISOString(entry.end_time) : "",
 
       is_other_project: entry.is_other_project,
       other_project_details: entry.other_project_details || "",
@@ -350,56 +358,188 @@ const TimeTrackingPage = () => {
     setIsModalOpen(true);
   };
 
+  // En tu componente TimeTrackingPage.jsx...
+
+  // --- NUEVA FUNCIÓN AUXILIAR 1: Para calcular la duración en horas ---
+  // Devuelve 0 si no hay hora de fin, para que no afecte los cálculos.
+  const calculateDurationInHours = (startTime, endTime) => {
+    if (!startTime || !endTime) {
+      return 0;
+    }
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const durationInMilliseconds = end - start;
+    // Retorna el valor en horas, o 0 si el cálculo es inválido (ej. end < start)
+    return Math.max(0, durationInMilliseconds / (1000 * 60 * 60));
+  };
+
+  // --- NUEVA FUNCIÓN AUXILIAR 2: Para actualizar las horas de un proyecto ---
+  // 'hoursToAdjust' puede ser positivo (para sumar) o negativo (para restar).
+  const updateProjectHours = async (projectId, hoursToAdjust) => {
+    if (!projectId || hoursToAdjust === 0) {
+      return; // No hacemos nada si no hay proyecto o el ajuste es cero.
+    }
+
+    try {
+      // Obtenemos las horas actuales del proyecto. Es una operación atómica en la DB.
+      // NOTA: Para máxima robustez en un entorno de alta concurrencia, esto se haría
+      // con una función RPC en la base de datos, pero este enfoque es excelente para la mayoría de los casos.
+      const { data: project, error: fetchError } = await supabase
+        .from("proyectos")
+        .select("horas, nombre")
+        .eq("uuid_id", projectId)
+        .single();
+
+      if (fetchError)
+        throw new Error(
+          `No se pudo obtener el proyecto para ajustar horas: ${fetchError.message}`
+        );
+
+      const newHours = project.horas + hoursToAdjust; // Restamos porque hoursToAdjust representa el "gasto"
+
+      const { error: updateError } = await supabase
+        .from("proyectos")
+        .update({ horas: newHours })
+        .eq("uuid_id", projectId);
+
+      if (updateError)
+        throw new Error(
+          `No se pudo actualizar el proyecto: ${updateError.message}`
+        );
+
+      console.log(
+        `Horas del proyecto "${project.nombre}" actualizadas correctamente.`
+      );
+    } catch (error) {
+      // Si la actualización de horas falla, lo notificamos pero no detenemos el flujo principal.
+      toast({
+        title: "Error al actualizar horas",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // --- TU FUNCIÓN handleModalSubmit TOTALMENTE REFACTORIZADA ---
   const handleModalSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
-    const dataToSave = {
-      user_id: currentEntry ? currentEntry.user_id : user.id,
-      project_id: modalFormData.is_other_project
-        ? null
-        : modalFormData.project_id, // Este es el uuid_id del form
-      date: modalFormData.date,
-      start_time: new Date(modalFormData.start_time).toISOString(),
-      end_time: modalFormData.end_time
-        ? new Date(modalFormData.end_time).toISOString()
-        : null,
-      is_other_project: modalFormData.is_other_project,
-      other_project_details: modalFormData.is_other_project
-        ? modalFormData.other_project_details
-        : null,
-      notes: modalFormData.notes,
-    };
-    if (isAdmin && currentEntry) dataToSave.edited_by = user.id;
+    try {
+      // --- LÓGICA PARA EDITAR UN FICHAJE EXISTENTE ---
+      if (currentEntry) {
+        // 1. Calculamos la duración ORIGINAL del fichaje (antes de editar)
+        const oldDuration = calculateDurationInHours(
+          currentEntry.start_time,
+          currentEntry.end_time
+        );
+        const oldProjectId = currentEntry.project_id;
 
-    const response = currentEntry
-      ? await supabase
+        // 2. Preparamos y guardamos los NUEVOS datos del fichaje
+        const dataToSave = {
+          project_id: modalFormData.is_other_project
+            ? null
+            : modalFormData.project_id,
+          date: modalFormData.date,
+          start_time: new Date(modalFormData.start_time).toISOString(),
+          end_time: modalFormData.end_time
+            ? new Date(modalFormData.end_time).toISOString()
+            : null,
+          is_other_project: modalFormData.is_other_project,
+          other_project_details: modalFormData.is_other_project
+            ? modalFormData.other_project_details
+            : null,
+          notes: modalFormData.notes,
+          edited_by: isAdmin ? user.id : null,
+        };
+
+        const { data: updatedEntry, error } = await supabase
           .from("time_tracking")
           .update(dataToSave)
           .eq("id", currentEntry.id)
           .select()
-          .single()
-      : await supabase
+          .single();
+
+        if (error) throw error; // Si falla aquí, no continuamos.
+
+        // 3. Calculamos la NUEVA duración
+        const newDuration = calculateDurationInHours(
+          updatedEntry.start_time,
+          updatedEntry.end_time
+        );
+        const newProjectId = updatedEntry.project_id;
+
+        // 4. Lógica de ajuste de horas
+        if (oldProjectId === newProjectId) {
+          // El proyecto no cambió, solo ajustamos la diferencia
+          const durationDelta = newDuration - oldDuration;
+          if (newProjectId) {
+            await updateProjectHours(newProjectId, durationDelta);
+          }
+        } else {
+          // ¡El proyecto cambió!
+          // Devolvemos las horas al proyecto antiguo
+          if (oldProjectId) {
+            await updateProjectHours(oldProjectId, -oldDuration); // Sumamos las horas de vuelta
+          }
+          // Restamos las horas del proyecto nuevo
+          if (newProjectId) {
+            await updateProjectHours(newProjectId, newDuration);
+          }
+        }
+
+        toast({ title: "Fichaje Actualizado", variant: "success" });
+      } else {
+        // --- LÓGICA PARA CREAR UN NUEVO FICHAJE MANUAL ---
+        const dataToSave = {
+          user_id: user.id,
+          project_id: modalFormData.is_other_project
+            ? null
+            : modalFormData.project_id,
+          date: modalFormData.date,
+          start_time: new Date(modalFormData.start_time).toISOString(),
+          end_time: modalFormData.end_time
+            ? new Date(modalFormData.end_time).toISOString()
+            : null,
+          is_other_project: modalFormData.is_other_project,
+          other_project_details: modalFormData.is_other_project
+            ? modalFormData.other_project_details
+            : null,
+          notes: modalFormData.notes,
+        };
+
+        const { data: newEntry, error } = await supabase
           .from("time_tracking")
           .insert(dataToSave)
           .select()
           .single();
 
-    if (response.error) {
-      toast({
-        title: "Error",
-        description: `No se pudo guardar: ${response.error.message}`,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: currentEntry ? "Fichaje Actualizado" : "Fichaje Creado",
-        variant: "success",
-      });
+        if (error) throw error;
+
+        // Si se creó un fichaje ya cerrado, calculamos y restamos las horas
+        const duration = calculateDurationInHours(
+          newEntry.start_time,
+          newEntry.end_time
+        );
+        if (duration > 0 && newEntry.project_id) {
+          await updateProjectHours(newEntry.project_id, duration);
+        }
+
+        toast({ title: "Fichaje Creado", variant: "success" });
+      }
+
+      // Al final, si todo fue bien, refrescamos y cerramos
       fetchTimeEntries();
       resetModalFormAndClose();
+    } catch (error) {
+      toast({
+        title: "Error al Guardar",
+        description: `No se pudo guardar el fichaje: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const columns = [
