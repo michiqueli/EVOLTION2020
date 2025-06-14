@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { registerLocale } from "react-datepicker";
+import es from "date-fns/locale/es";
+registerLocale("es", es);
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +13,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -18,12 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { format } from "date-fns";
 import DataTable from "@/components/ui/data-table";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/contexts/UserContext";
 import {
-  CalendarPlus,
   CheckCircle,
   XCircle,
   Edit,
@@ -41,6 +47,13 @@ const AbsenceManagementPage = () => {
   const [usersList, setUsersList] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentAbsence, setCurrentAbsence] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+
+  // --- ESTADOS PARA EL NUEVO FORMULARIO DE DURACIÓN ---
+  const [durationMode, setDurationMode] = useState("range"); // Modos: 'half', 'single', 'range'
+  const [calculatedDuration, setCalculatedDuration] = useState(0);
+
   const [formData, setFormData] = useState({
     user_id: user?.id,
     start_date: "",
@@ -49,9 +62,8 @@ const AbsenceManagementPage = () => {
     reason: "",
     status: "SOLICITADA",
     comments_admin: "",
+    half_day_period: "am", // 'am' para mañana, 'pm' для tarde
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
 
   const isAdmin =
     user?.rol === "ADMINISTRADOR" ||
@@ -61,15 +73,14 @@ const AbsenceManagementPage = () => {
   const fetchAbsences = useCallback(async () => {
     setIsLoading(true);
     let query = supabase.from("absences").select(`
-    *,
-    autor: usuarios!absences_user_id_fkey1 (nombre),
-    editor: usuarios!absences_reviewed_by_id_fkey1 (nombre)
-  `);
+      *,
+      autor: usuarios!absences_user_id_fkey1 (nombre),
+      editor: usuarios!absences_reviewed_by_id_fkey1 (nombre)
+    `);
     if (!isAdmin) {
       query = query.eq("user_id", user.id);
     }
     query = query.order("start_date", { ascending: false });
-
     const { data, error } = await query;
     if (error) {
       toast({
@@ -92,7 +103,7 @@ const AbsenceManagementPage = () => {
     if (error) {
       toast({
         title: "Error",
-        description: "No se pudieron cargar los usuarios para el formulario.",
+        description: "No se pudieron cargar los usuarios.",
         variant: "destructive",
       });
     } else {
@@ -107,12 +118,56 @@ const AbsenceManagementPage = () => {
     }
   }, [fetchAbsences, fetchUsersForAdmin, isAdmin]);
 
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  // --- useEffect para calcular la duración dinámicamente ---
+  useEffect(() => {
+    let duration = 0;
+    try {
+      if (durationMode === "half") {
+        duration = formData.start_date ? 0.5 : 0;
+      } else if (durationMode === "single") {
+        duration = formData.start_date ? 1 : 0;
+      } else if (
+        durationMode === "range" &&
+        formData.start_date &&
+        formData.end_date
+      ) {
+        const start = new Date(formData.start_date);
+        const end = new Date(formData.end_date);
+        if (end < start) {
+          duration = 0;
+        } else {
+          const diffTime = end.getTime() - start.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+          duration = diffDays;
+        }
+      }
+    } catch (e) {
+      duration = 0; // Si las fechas son inválidas, la duración es 0.
+    }
+    setCalculatedDuration(duration);
+  }, [formData.start_date, formData.end_date, durationMode]);
+
+  const handleDateChange = (fieldName, newDate) => {
+    if (newDate) {
+      const formattedDate = format(newDate, "yyyy-MM-dd");
+      setFormData((prev) => ({ ...prev, [fieldName]: formattedDate }));
+    } else {
+      setFormData((prev) => ({ ...prev, [fieldName]: "" }));
+    }
   };
 
-  const handleSelectChange = (name, value) => {
+  const handleInputChange = (e) =>
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleSelectChange = (name, value) =>
     setFormData({ ...formData, [name]: value });
+  const handleRadioChange = (value) =>
+    setFormData({ ...formData, half_day_period: value });
+
+  const handleDurationModeChange = (value) => {
+    if (value) {
+      setDurationMode(value);
+      setFormData((prev) => ({ ...prev, start_date: "", end_date: "" }));
+    }
   };
 
   const resetFormAndClose = () => {
@@ -124,9 +179,11 @@ const AbsenceManagementPage = () => {
       reason: "",
       status: "SOLICITADA",
       comments_admin: "",
+      half_day_period: "am",
     });
     setCurrentAbsence(null);
     setIsModalOpen(false);
+    setDurationMode("range");
   };
 
   const openModalForCreate = () => {
@@ -139,11 +196,22 @@ const AbsenceManagementPage = () => {
       reason: "",
       status: "SOLICITADA",
       comments_admin: "",
+      half_day_period: "am",
     });
+    setDurationMode("range");
     setIsModalOpen(true);
   };
 
   const openModalForEdit = (absence) => {
+    // Lógica para determinar el modo de duración al abrir la edición
+    const isHalf = absence.is_half_day; // Asumiendo que tienes esta columna en la DB
+    const isSingle = absence.start_date === absence.end_date && !isHalf;
+
+    let mode = "range";
+    if (isHalf) mode = "half";
+    else if (isSingle) mode = "single";
+
+    setDurationMode(mode);
     setCurrentAbsence(absence);
     setFormData({
       user_id: absence.user_id,
@@ -153,6 +221,7 @@ const AbsenceManagementPage = () => {
       reason: absence.reason || "",
       status: absence.status,
       comments_admin: absence.comments_admin || "",
+      half_day_period: absence.half_day_period || "am",
     });
     setIsModalOpen(true);
   };
@@ -161,14 +230,19 @@ const AbsenceManagementPage = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const dataToSave = {
-      user_id: formData.user_id,
-      start_date: formData.start_date,
-      end_date: formData.end_date,
-      absence_type: formData.absence_type,
-      reason: formData.reason,
-      status: formData.status,
-    };
+    // Copiamos los datos del formulario para modificarlos antes de guardar
+    const dataToSave = { ...formData };
+
+    // Ajustamos la fecha de fin según el modo de duración
+    if (durationMode === "half" || durationMode === "single") {
+      dataToSave.end_date = dataToSave.start_date;
+    }
+
+    // Guardamos si es medio día y qué período es.
+    // Necesitarás añadir estas columnas a tu tabla 'absences'
+    dataToSave.is_half_day = durationMode === "half";
+    dataToSave.half_day_period =
+      durationMode === "half" ? formData.half_day_period : null;
 
     if (isAdmin) {
       dataToSave.comments_admin = formData.comments_admin;
@@ -194,11 +268,10 @@ const AbsenceManagementPage = () => {
         .single();
     }
 
-    const { error } = response;
-    if (error) {
+    if (response.error) {
       toast({
         title: "Error",
-        description: `No se pudo guardar la ausencia: ${error.message}`,
+        description: `No se pudo guardar la ausencia: ${response.error.message}`,
         variant: "destructive",
       });
     } else {
@@ -240,7 +313,7 @@ const AbsenceManagementPage = () => {
     setIsLoading(false);
   };
 
-  const columns = useMemo(() => {
+  const finalColumns = useMemo(() => {
     const baseColumns = [
       { header: "Tipo", accessor: "absence_type", sortable: true },
       { header: "Desde", accessor: "start_date", sortable: true },
@@ -267,29 +340,23 @@ const AbsenceManagementPage = () => {
         ),
       },
     ];
-
-    if (isAdmin) {
-      return [
-        {
-          header: "Empleado",
-          accessor: "autor.nombre",
-          cell: ({ row }) => row.autor?.nombre || "Desconocido",
-          sortable: true,
-        },
-        ...baseColumns,
-        {
-          header: "Revisado por",
-          accessor: "editor.nombre",
-          cell: ({ row }) => row.editor?.nombre || "N/A",
-        },
-      ];
-    }
-
-    return baseColumns;
-  }, [isAdmin]);
-
-  const finalColumns = useMemo(
-    () => [
+    let columns = isAdmin
+      ? [
+          {
+            header: "Empleado",
+            accessor: "autor.nombre",
+            cell: ({ row }) => row.autor?.nombre || "Desconocido",
+            sortable: true,
+          },
+          ...baseColumns,
+          {
+            header: "Revisado por",
+            accessor: "editor.nombre",
+            cell: ({ row }) => row.editor?.nombre || "N/A",
+          },
+        ]
+      : baseColumns;
+    return [
       ...columns,
       {
         header: "Acciones",
@@ -302,7 +369,7 @@ const AbsenceManagementPage = () => {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleStatusUpdate(row.id, "APROBADA")}
-                  className="text-green-600 hover:text-green-700 hover:bg-green-50 p-1"
+                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
                 >
                   <CheckCircle className="h-5 w-5" />
                 </Button>
@@ -310,7 +377,7 @@ const AbsenceManagementPage = () => {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleStatusUpdate(row.id, "RECHAZADA")}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
                 >
                   <XCircle className="h-5 w-5" />
                 </Button>
@@ -322,7 +389,7 @@ const AbsenceManagementPage = () => {
                 variant="outline"
                 size="icon"
                 onClick={() => openModalForEdit(row)}
-                className="text-primary border-primary hover:bg-primary/10 p-1"
+                className="text-primary border-primary hover:bg-primary/10"
               >
                 <Edit className="h-4 w-4" />
               </Button>
@@ -330,9 +397,8 @@ const AbsenceManagementPage = () => {
           </div>
         ),
       },
-    ],
-    [columns, isAdmin, user?.id]
-  );
+    ];
+  }, [isAdmin, user?.id]);
 
   return (
     <motion.div
@@ -362,7 +428,6 @@ const AbsenceManagementPage = () => {
         open={isModalOpen}
         onOpenChange={(isOpen) => {
           if (!isOpen) resetFormAndClose();
-          else setIsModalOpen(true);
         }}
       >
         <DialogContent className="sm:max-w-lg bg-card border-border">
@@ -375,7 +440,7 @@ const AbsenceManagementPage = () => {
                 : "Solicitar Ausencia"}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <form onSubmit={handleSubmit} className="space-y-6 py-2">
             {isAdmin && (
               <div>
                 <Label htmlFor="user_id_form">Empleado</Label>
@@ -387,10 +452,7 @@ const AbsenceManagementPage = () => {
                   }
                   required={isAdmin}
                 >
-                  <SelectTrigger
-                    id="user_id_form"
-                    className="mt-1 bg-background border-input"
-                  >
+                  <SelectTrigger id="user_id_form" className="mt-1">
                     <SelectValue placeholder="Selecciona un empleado" />
                   </SelectTrigger>
                   <SelectContent>
@@ -404,29 +466,115 @@ const AbsenceManagementPage = () => {
               </div>
             )}
             <div>
-              <Label htmlFor="start_date">Fecha de Inicio</Label>
-              <Input
-                id="start_date"
-                name="start_date"
-                type="date"
-                value={formData.start_date}
-                onChange={handleInputChange}
-                required
-                className="mt-1 bg-background border-input"
-              />
+              <Label>Duración de la Ausencia</Label>
+              <ToggleGroup
+                type="single"
+                value={durationMode}
+                onValueChange={handleDurationModeChange}
+                className="grid grid-cols-3 mt-1"
+              >
+                <ToggleGroupItem value="half" aria-label="Medio día">
+                  Medio día
+                </ToggleGroupItem>
+                <ToggleGroupItem value="single" aria-label="Un día">
+                  Un día
+                </ToggleGroupItem>
+                <ToggleGroupItem value="range" aria-label="Varios días">
+                  Varios días
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
-            <div>
-              <Label htmlFor="end_date">Fecha de Fin</Label>
-              <Input
-                id="end_date"
-                name="end_date"
-                type="date"
-                value={formData.end_date}
-                onChange={handleInputChange}
-                required
-                className="mt-1 bg-background border-input"
-              />
-            </div>
+
+            {durationMode === "half" && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-4"
+              >
+                <div className="flex-1">
+                  <Label htmlFor="start_date">Fecha</Label>
+                  <DatePicker
+                    locale="es" // Usar el idioma español
+                    selected={
+                      formData.start_date ? new Date(formData.start_date) : null
+                    }
+                    onChange={(date) => handleDateChange("start_date", date)} // Necesitas una función que maneje el objeto Date
+                    dateFormat="dd/MM/yyyy"
+                    className="w-full bg-background border border-input rounded-md px-3 py-2" // <-- ¡Puedes aplicar tus clases de Tailwind!
+                    placeholderText="Selecciona una fecha"
+                  />
+                </div>
+                <RadioGroup
+                  name="half_day_period"
+                  value={formData.half_day_period}
+                  onValueChange={handleRadioChange}
+                  className="pt-6"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="am" id="am" />
+                    <Label htmlFor="am">Mañana</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="pm" id="pm" />
+                    <Label htmlFor="pm">Tarde</Label>
+                  </div>
+                </RadioGroup>
+              </motion.div>
+            )}
+
+            {durationMode === "single" && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Label htmlFor="start_date">Fecha</Label>
+                <DatePicker
+                  locale="es" // Usar el idioma español
+                  selected={
+                    formData.start_date ? new Date(formData.start_date) : null
+                  }
+                  onChange={(date) => handleDateChange("start_date", date)} // Necesitas una función que maneje el objeto Date
+                  dateFormat="dd/MM/yyyy"
+                  className="w-full bg-background border border-input rounded-md px-3 py-2" // <-- ¡Puedes aplicar tus clases de Tailwind!
+                  placeholderText="Selecciona una fecha"
+                />
+              </motion.div>
+            )}
+
+            {durationMode === "range" && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="grid grid-cols-2 gap-4"
+              >
+                <div>
+                  <Label htmlFor="start_date">Empezando desde</Label>
+                  <DatePicker
+                    locale="es" // Usar el idioma español
+                    selected={
+                      formData.start_date ? new Date(formData.start_date) : null
+                    }
+                    onChange={(date) => handleDateChange("start_date", date)} // Necesitas una función que maneje el objeto Date
+                    dateFormat="dd/MM/yyyy"
+                    className="w-full bg-background border border-input rounded-md px-3 py-2" // <-- ¡Puedes aplicar tus clases de Tailwind!
+                    placeholderText="Selecciona una fecha"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="end_date">Acabando en</Label>
+                  <DatePicker
+                    locale="es" // Usar el idioma español
+                    selected={
+                      formData.end_date ? new Date(formData.end_date) : null
+                    }
+                    onChange={(date) => handleDateChange("end_date", date)} // Necesitas una función que maneje el objeto Date
+                    dateFormat="dd/MM/yyyy"
+                    className="w-full bg-background border border-input rounded-md px-3 py-2" // <-- ¡Puedes aplicar tus clases de Tailwind!
+                    placeholderText="Selecciona una fecha"
+                  />
+                </div>
+              </motion.div>
+            )}
             <div>
               <Label htmlFor="absence_type">Tipo de Ausencia</Label>
               <Select
@@ -436,10 +584,7 @@ const AbsenceManagementPage = () => {
                   handleSelectChange("absence_type", value)
                 }
               >
-                <SelectTrigger
-                  id="absence_type"
-                  className="mt-1 bg-background border-input"
-                >
+                <SelectTrigger id="absence_type" className="mt-1">
                   <SelectValue placeholder="Selecciona un tipo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -458,9 +603,19 @@ const AbsenceManagementPage = () => {
                 name="reason"
                 value={formData.reason}
                 onChange={handleInputChange}
-                className="mt-1 bg-background border-input"
+                className="mt-1"
               />
             </div>
+
+            <div className="text-sm text-muted-foreground pt-2 text-center">
+              <p>
+                La ausencia tendrá una duración de **{calculatedDuration}{" "}
+                {calculatedDuration === 1 ? "día" : "días"}**.
+                {formData.absence_type === "VACACIONES" &&
+                  ` Se usarán ${calculatedDuration} días de vacaciones.`}
+              </p>
+            </div>
+
             {isAdmin && (
               <>
                 <div>
@@ -472,10 +627,7 @@ const AbsenceManagementPage = () => {
                       handleSelectChange("status", value)
                     }
                   >
-                    <SelectTrigger
-                      id="status_form"
-                      className="mt-1 bg-background border-input"
-                    >
+                    <SelectTrigger id="status_form" className="mt-1">
                       <SelectValue placeholder="Selecciona estado" />
                     </SelectTrigger>
                     <SelectContent>
@@ -494,7 +646,7 @@ const AbsenceManagementPage = () => {
                     name="comments_admin"
                     value={formData.comments_admin}
                     onChange={handleInputChange}
-                    className="mt-1 bg-background border-input"
+                    className="mt-1"
                   />
                 </div>
               </>
@@ -538,7 +690,7 @@ const AbsenceManagementPage = () => {
             isAdmin
               ? [
                   { accessor: "autor.nombre", header: "Empleado" },
-                  { accessor: "reason", header: "Motivo" }
+                  { accessor: "reason", header: "Motivo" },
                 ]
               : [{ accessor: "reason", header: "Motivo" }]
           }
