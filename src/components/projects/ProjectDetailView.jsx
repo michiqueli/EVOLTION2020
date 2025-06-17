@@ -15,7 +15,7 @@ import {
   Paperclip,
   ExternalLink,
 } from "lucide-react";
-import { getStatusStyles, projectStatusOptions} from "./ProjectCard";
+import { getStatusStyles } from "./ProjectCard";
 import { cn } from "@/lib/utils";
 
 const ProjectDetailView = ({ isOpen, onOpenChange, project }) => {
@@ -70,7 +70,7 @@ const ProjectDetailView = ({ isOpen, onOpenChange, project }) => {
         </div>
 
         <div className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4 p-4 bg-card rounded-lg border">
               <h3 className="text-xl font-semibold text-foreground flex items-center">
                 <Building className="h-5 w-5 mr-2 text-primary" />
@@ -116,25 +116,6 @@ const ProjectDetailView = ({ isOpen, onOpenChange, project }) => {
                   Abrir en Google Maps <ExternalLink className="h-4 w-4 ml-1" />
                 </a>
               )}
-
-              <div className="mt-3 h-48 bg-muted rounded-md overflow-hidden border">
-                {googleMapsEmbedUrl ? (
-                  <iframe
-                    width="100%"
-                    height="300"
-                    style={{ border: "0" }}
-                    src={googleMapsUrl}
-                    allowFullScreen=""
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    title={`Google Maps de ${project.nombre}`}
-                  ></iframe>
-                ) : (
-                  <span className="text-sm text-muted-foreground">
-                    (Dirección no válida o clave de API de Google Maps faltante)
-                  </span>
-                )}
-              </div>
             </div>
           )}
 

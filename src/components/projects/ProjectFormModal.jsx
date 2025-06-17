@@ -174,22 +174,6 @@ const ProjectFormModal = ({
             isUploading={false} // opcional: podrías agregar un estado para mostrar animación
             disabled={!canManage}
           />
-
-          <div className="space-y-2">
-            <Label htmlFor="observaciones" className="text-foreground">
-              Observaciones
-            </Label>
-            <Input
-              id="observaciones"
-              name="observaciones"
-              value={projectData.observaciones}
-              onChange={onInputChange}
-              placeholder="Observaciones adicionales..."
-              className="bg-card border-input"
-              disabled={!canManage}
-            />
-          </div>
-
           <DialogFooter className="pt-4">
             <Button
               type="button"

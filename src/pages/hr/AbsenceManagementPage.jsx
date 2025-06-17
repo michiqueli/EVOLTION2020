@@ -51,7 +51,7 @@ const AbsenceManagementPage = () => {
   const { toast } = useToast();
 
   // --- ESTADOS PARA EL NUEVO FORMULARIO DE DURACIÓN ---
-  const [durationMode, setDurationMode] = useState("range"); // Modos: 'half', 'single', 'range'
+  const [durationMode, setDurationMode] = useState("single"); // Modos: 'half', 'single', 'range'
   const [calculatedDuration, setCalculatedDuration] = useState(0);
 
   const [formData, setFormData] = useState({
@@ -494,7 +494,7 @@ const AbsenceManagementPage = () => {
                 <div className="flex-1">
                   <Label htmlFor="start_date">Fecha</Label>
                   <DatePicker
-                    locale="es" // Usar el idioma español
+                    locale="es"
                     selected={
                       formData.start_date ? new Date(formData.start_date) : null
                     }
@@ -529,13 +529,13 @@ const AbsenceManagementPage = () => {
               >
                 <Label htmlFor="start_date">Fecha</Label>
                 <DatePicker
-                  locale="es" // Usar el idioma español
+                  locale="es"
                   selected={
                     formData.start_date ? new Date(formData.start_date) : null
                   }
-                  onChange={(date) => handleDateChange("start_date", date)} // Necesitas una función que maneje el objeto Date
+                  onChange={(date) => handleDateChange("start_date", date)}
                   dateFormat="dd/MM/yyyy"
-                  className="w-full bg-background border border-input rounded-md px-3 py-2" // <-- ¡Puedes aplicar tus clases de Tailwind!
+                  className="w-full bg-background border border-input rounded-md px-3 py-2"
                   placeholderText="Selecciona una fecha"
                 />
               </motion.div>
