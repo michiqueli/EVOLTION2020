@@ -609,7 +609,7 @@ const TimeTrackingPage = () => {
               className="bg-green-500 hover:bg-green-600 text-white shadow-lg flex items-center gap-2"
               disabled={isLoading}
             >
-              <PlayCircle className="h-5 w-5" /> Iniciar Fichaje
+              <PlayCircle className="h-5 w-5" /> Iniciar Jornada
             </Button>
           ) : (
             <Button
@@ -617,7 +617,7 @@ const TimeTrackingPage = () => {
               className="bg-red-500 hover:bg-red-600 text-white shadow-lg flex items-center gap-2"
               disabled={isLoading}
             >
-              <StopCircle className="h-5 w-5" /> Detener Fichaje
+              <StopCircle className="h-5 w-5" /> Finalizar Jornada
             </Button>
           )}
           {isAdmin && (
@@ -625,7 +625,7 @@ const TimeTrackingPage = () => {
               onClick={openModalForCreate}
               className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg flex items-center gap-2"
             >
-              <PlusCircle className="h-5 w-5" /> Añadir Manual
+              <PlusCircle className="h-5 w-5" /> Añadir de forma manual
             </Button>
           )}
         </div>

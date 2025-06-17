@@ -101,12 +101,13 @@ const LoginPage = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              omPaste={(e) => {
+              onPaste={(e) => {
                 e.preventDefault();
                 const pastedText = e.clipboardData
                   .getData("text")
                   .trim()
                   .toLowerCase();
+                  console.log(pastedText)
                 setEmail(pastedText);
               }}
               placeholder="tu@email.com"
@@ -127,7 +128,7 @@ const LoginPage = () => {
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              omPaste={(e) => {
+              onPaste={(e) => {
                 e.preventDefault();
                 const pastedPass = e.clipboardData
                   .getData("text")

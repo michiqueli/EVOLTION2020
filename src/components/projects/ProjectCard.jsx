@@ -1,7 +1,6 @@
-
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
+import React from "react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,97 +9,239 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarDays, Loader, CheckCircle, MoreVertical, Edit2, Trash2, Info, Eye } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useUser, ROLES } from '@/contexts/UserContext';
+import {
+  CalendarDays,
+  Loader,
+  CheckCircle,
+  MoreVertical,
+  Edit2,
+  Trash2,
+  Eye,
+  XCircle,
+  PauseCircle,
+} from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { useUser, ROLES } from "@/contexts/UserContext";
 
+// --- PASO 1: MEJORAMOS LA ESTRUCTURA DE DATOS PARA LOS ESTILOS ---
+// Ahora cada estilo tiene su propia propiedad. ¡Mucho más claro y seguro!
 export const projectStatusOptions = [
-  { value: 'Por Iniciar', label: 'Por Iniciar', icon: <CalendarDays className="h-4 w-4 mr-2" />, color: 'bg-blue-500/20 text-blue-700 border-blue-500' },
-  { value: 'En Proceso', label: 'En Proceso', icon: <Loader className="h-4 w-4 mr-2 animate-spin" />, color: 'bg-yellow-500/20 text-yellow-700 border-yellow-500' },
-  { value: 'Finalizada', label: 'Finalizada', icon: <CheckCircle className="h-4 w-4 mr-2" />, color: 'bg-green-500/20 text-green-700 border-green-500' }
+  {
+    value: "Por Iniciar",
+    label: "Por Iniciar",
+    icon: <CalendarDays />,
+    badgeClasses:
+      "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+    borderClasses: "border-blue-500",
+    leftBarClasses: "bg-blue-500",
+    iconColor: "text-blue-500",
+  },
+  {
+    value: "En Proceso",
+    label: "En Proceso",
+    icon: <Loader className="animate-spin" />,
+    badgeClasses:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+    borderClasses: "border-yellow-500",
+    leftBarClasses: "bg-yellow-500",
+    iconColor: "text-yellow-500",
+  },
+  {
+    value: "Pausado",
+    label: "Pausado",
+    icon: <PauseCircle />,
+    badgeClasses:
+      "bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300",
+    borderClasses: "border-violet-500",
+    leftBarClasses: "bg-violet-500",
+    iconColor: "text-violet-500",
+  },
+  {
+    value: "Finalizada",
+    label: "Finalizada",
+    icon: <CheckCircle />,
+    badgeClasses:
+      "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+    borderClasses: "border-green-500",
+    leftBarClasses: "bg-green-500",
+    iconColor: "text-green-500",
+  },
+  {
+    value: "Cancelado",
+    label: "Cancelado",
+    icon: <XCircle />,
+    badgeClasses:
+      "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+    borderClasses: "border-red-500",
+    leftBarClasses: "bg-red-500",
+    iconColor: "text-red-500",
+  },
 ];
-
 export const getStatusStyles = (statusValue) => {
-  return projectStatusOptions.find(s => s.value === statusValue) || projectStatusOptions[0];
+  return (
+    projectStatusOptions.find((s) => s.value === statusValue) ||
+    projectStatusOptions[0]
+  );
 };
 
-const ProjectCard = ({ project, onUpdateStatus, onEdit, onDelete, onViewDetails }) => {
+const ProjectCard = ({
+  project,
+  onUpdateStatus,
+  onEdit,
+  onDelete,
+  onViewDetails,
+  isInactivo = false,
+}) => {
   const { user } = useUser();
   const statusStyle = getStatusStyles(project.estado);
 
-  const canManage = user && (user.role === ROLES.CEO || user.role === ROLES.ADMIN || user.role === ROLES.SUPERVISOR || user.role === ROLES.DEVELOPER);
-  const isTechnician = user && user.role === ROLES.WORKER;
-
-  const handleCardClick = () => {
-    if (isTechnician) {
-      onViewDetails(project);
-    }
-  };
+  const canManage =
+    user &&
+    (user.rol === ROLES.CEO ||
+      user.rol === ROLES.ADMIN ||
+      user.rol === ROLES.SUPERVISOR ||
+      user.rol === ROLES.DEVELOPER);
+  const isTechnician = user && user.rol === ROLES.WORKER;
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.8 }}
-      transition={{ type: "spring", stiffness: 260, damping: 20 }}
-      className={cn(
-        "bg-card p-4 rounded-xl shadow-lg border relative overflow-hidden",
-        statusStyle.color.split(' ')[2],
-        isTechnician ? "cursor-pointer hover:shadow-primary/30" : ""
-      )}
-      onClick={isTechnician ? handleCardClick : undefined}
-    >
-      <div className={cn("absolute top-0 left-0 h-full w-1.5", statusStyle.color.split(' ')[0])}></div>
-      <div className="pl-3">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-xl font-semibold text-primary pr-8">{project.nombre}</h3>
-          {canManage && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-2 right-2">
-                  <MoreVertical className="h-5 w-5 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-background border-border shadow-xl">
-                <DropdownMenuLabel>Estado del Proyecto</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {projectStatusOptions.map(statusOpt => (
-                  <DropdownMenuItem key={statusOpt.value} onClick={(e) => { e.stopPropagation(); onUpdateStatus(project.id, statusOpt.value);}} disabled={project.estado === statusOpt.value}>
-                    {React.cloneElement(statusOpt.icon, { className: cn(statusOpt.icon.props.className, statusOpt.color.split(' ')[1]) })}
-                    <span>{statusOpt.label}</span>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(project); }}>
-                  <Edit2 className="mr-2 h-4 w-4" />
-                  Editar Detalles
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(project.id); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Eliminar Proyecto
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(project); }}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Ver Detalles
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {isTechnician && (
-             <Button variant="ghost" size="icon" className="h-7 w-7 absolute top-2 right-2" onClick={(e) => { e.stopPropagation(); onViewDetails(project); }}>
-                <Eye className="h-5 w-5 text-muted-foreground" />
-            </Button>
-          )}
-        </div>
-        <p className="text-sm text-muted-foreground"><span className="font-medium">Dirección:</span> {project.direccion}</p>
-        <div className={cn("mt-3 text-xs font-medium px-2 py-0.5 rounded-full inline-flex items-center", statusStyle.color)}>
-          {React.cloneElement(statusStyle.icon, { className: "h-3 w-3 mr-1"})}
-          {statusStyle.label}
-        </div>
-      </div>
-    </motion.div>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <motion.div
+            layout
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            whileHover={{
+              scale: 1.04,
+              opacity: 1,
+              filter: "grayscale(0)",
+            }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            className={cn(
+              "bg-card p-4 rounded-xl shadow-lg border relative overflow-hidden cursor-pointer",
+              "transition-shadow duration-300",
+              "hover:shadow-lg hover:shadow-primary/20",
+              statusStyle.borderClasses,
+              isInactivo && "opacity-60 grayscale"
+            )}
+            onClick={() => onViewDetails(project)}
+          >
+            <div
+              className={cn(
+                "absolute top-0 left-0 h-full w-1.5",
+                statusStyle.leftBarClasses
+              )}
+            ></div>
+
+            <div className="pl-4">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="text-xl font-semibold text-primary pr-8">
+                  {project.nombre}
+                </h3>
+
+                {canManage && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 absolute top-2 right-2"
+                      >
+                        <MoreVertical className="h-5 w-5 text-muted-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="bg-background border-border shadow-xl"
+                    >
+                      <DropdownMenuLabel>Cambiar Estado</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {projectStatusOptions.map((statusOpt) => (
+                        <DropdownMenuItem
+                          key={statusOpt.value}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdateStatus(project.id, statusOpt.value);
+                          }}
+                          disabled={project.estado === statusOpt.value}
+                          className="flex items-center gap-2"
+                        >
+                          {React.cloneElement(statusOpt.icon, {
+                            className: cn("h-4 w-4", statusOpt.iconColor),
+                          })}
+                          <span>{statusOpt.label}</span>
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit(project);
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        <Edit2 className="h-4 w-4" /> Editar Proyecto
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(project.id);
+                        }}
+                        className="text-destructive focus:text-destructive focus:bg-destructive/10 flex items-center gap-2"
+                      >
+                        <Trash2 className="h-4 w-4" /> Eliminar Proyecto
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+
+                {isTechnician && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 absolute top-2 right-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewDetails(project);
+                    }}
+                  >
+                    <Eye className="h-5 w-5 text-muted-foreground" />
+                  </Button>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium">Dirección:</span>{" "}
+                {project.direccion}
+              </p>
+              <div
+                className={cn(
+                  "mt-3 text-xs font-medium px-2.5 py-1 rounded-full inline-flex items-center",
+                  statusStyle.badgeClasses
+                )}
+              >
+                {React.cloneElement(statusStyle.icon, {
+                  className: "h-3.5 w-3.5 mr-1.5",
+                })}
+                {statusStyle.label}
+              </div>
+            </div>
+          </motion.div>
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          className="bg-primary text-primary-foreground"
+        >
+          <p>Haz clic para ver los detalles del proyecto</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 

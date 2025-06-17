@@ -97,6 +97,17 @@ const sidebarConfig = [
           ROLES.DEVELOPER,
         ],
       },
+      {
+        to: "/tracking",
+        label: "Seguimiento",
+        icon: ListChecks,
+        roles: [
+          ROLES.ADMIN,
+          ROLES.CEO,
+          ROLES.SUPERVISOR,
+          ROLES.DEVELOPER,
+        ],
+      },
     ],
   },
   {
