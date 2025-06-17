@@ -12,9 +12,9 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const { login, authError, clearAuthError } = useUser();
   const { toast } = useToast();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState(''); // Estado para errores del formulario
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(""); // Estado para errores del formulario
   const [isLoading, setIsLoading] = useState(false);
   const location = useLocation();
 
@@ -101,6 +101,14 @@ const LoginPage = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              omPaste={(e) => {
+                e.preventDefault();
+                const pastedText = e.clipboardData
+                  .getData("text")
+                  .trim()
+                  .toLowerCase();
+                setEmail(pastedText);
+              }}
               placeholder="tu@email.com"
               required
               className="mt-1 text-base"
@@ -119,6 +127,14 @@ const LoginPage = () => {
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              omPaste={(e) => {
+                e.preventDefault();
+                const pastedPass = e.clipboardData
+                  .getData("text")
+                  .trim()
+                  .toLowerCase();
+                setPassword(pastedPass);
+              }}
               placeholder="••••••••"
               required
               className="mt-1 text-base pr-10"
