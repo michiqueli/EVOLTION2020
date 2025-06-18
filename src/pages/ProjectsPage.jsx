@@ -25,7 +25,17 @@ const initialNewProjectState = {
   observaciones: "",
   estado: "Por Iniciar",
   horas: 0,
+  proyect_type: "",
+  detalles_tipo_proyecto: {},
 };
+
+const PROJECT_TYPES = [
+  { value: "placas_domesticas", label: "Placas Solares Domésticas" },
+  { value: "placas_industrial", label: "Placas Solares Industria" },
+  { value: "hincado", label: "Hincado" },
+  { value: "seguridad_altura", label: "Seguridad en Altura" },
+  { value: "otro", label: "Otro" },
+];
 
 const ProjectsPage = () => {
   const { user } = useUser();
@@ -39,6 +49,8 @@ const ProjectsPage = () => {
   );
   const [statusFilter, setStatusFilter] = useState("activos");
   const { toast } = useToast();
+  const [projectType, setProjectType] = useState(PROJECT_TYPES[0].value);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { proyectosActivos, proyectosNoActivos } = useMemo(() => {
     const statusOrder = {
@@ -114,27 +126,35 @@ const ProjectsPage = () => {
     setCurrentProjectData(initialNewProjectState);
     setEditingProject(null);
     setViewingProject(null);
+    setProjectType(PROJECT_TYPES[0].value);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, submittedProjectType) => {
     e.preventDefault();
     if (!canManageProjects) {
       toast({ title: "Acción no permitida", variant: "destructive" });
       return;
     }
 
+    setIsLoading(true);
+
     try {
+      const dataToSave = {
+        nombre: currentProjectData.nombre,
+        direccion: currentProjectData.direccion,
+        descripcion: currentProjectData.descripcion,
+        documentacion: currentProjectData.documentacion,
+        observaciones: currentProjectData.observaciones,
+        project_type: projectType,
+        detalles_tipo_proyecto: currentProjectData.detalles_tipo_proyecto || {},
+      };
+
+      // 2. Lógica para diferenciar entre EDITAR y CREAR
       if (editingProject) {
+        // --- LÓGICA DE ACTUALIZACIÓN ---
         const { error } = await supabase
           .from("proyectos")
-          .update({
-            nombre: currentProjectData.nombre,
-            direccion: currentProjectData.direccion,
-            descripcion: currentProjectData.descripcion,
-            documentacion: currentProjectData.documentacion,
-            observaciones: currentProjectData.observaciones,
-            estado: currentProjectData.estado,
-          })
+          .update(dataToSave)
           .eq("id", editingProject.id);
 
         if (error) throw error;
@@ -143,13 +163,10 @@ const ProjectsPage = () => {
           description: `El proyecto "${currentProjectData.nombre}" ha sido modificado.`,
         });
       } else {
+        // --- LÓGICA DE CREACIÓN ---
         const { error } = await supabase.from("proyectos").insert([
           {
-            nombre: currentProjectData.nombre,
-            direccion: currentProjectData.direccion,
-            descripcion: currentProjectData.descripcion,
-            documentacion: currentProjectData.documentacion,
-            observaciones: currentProjectData.observaciones,
+            ...dataToSave,
             estado: "Por Iniciar",
             horas: 0,
           },
@@ -161,7 +178,6 @@ const ProjectsPage = () => {
           description: `El proyecto "${currentProjectData.nombre}" ha sido añadido.`,
         });
       }
-
       await fetchProjects();
       resetFormAndStates();
       setIsFormModalOpen(false);
@@ -172,6 +188,8 @@ const ProjectsPage = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -244,6 +262,7 @@ const ProjectsPage = () => {
     }
     setEditingProject(project);
     setCurrentProjectData({ ...project });
+    setProjectType(project.project_type || PROJECT_TYPES[0].value);
     setIsDetailViewOpen(false);
     setIsFormModalOpen(true);
   };
@@ -346,6 +365,9 @@ const ProjectsPage = () => {
         onSubmit={handleSubmit}
         isEditing={!!editingProject}
         canManage={canManageProjects}
+        projectType={projectType}
+        onProjectTypeChange={setProjectType}
+        isLoading={isLoading}
       />
 
       <ProjectDetailView

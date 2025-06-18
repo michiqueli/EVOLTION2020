@@ -18,51 +18,42 @@ export const UserProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [authError, setAuthError] = useState(null);
-  const [activeProjectId, setActiveProjectId] = useState(() => {
-    return localStorage.getItem("activeProjectId");
-  });
-  const [activeProjectType, setActiveProjectType] = useState(() => {
-    return localStorage.getItem("activeProjectType");
-  });
-
+  const [activeProjectId, setActiveProjectId] = useState(() =>
+    localStorage.getItem("activeProjectId")
+  );
   useEffect(() => {
-    if (activeProjectId) {
+    if (activeProjectId)
       localStorage.setItem("activeProjectId", activeProjectId);
-    } else {
-      localStorage.removeItem("activeProjectId");
-    }
+    else localStorage.removeItem("activeProjectId");
   }, [activeProjectId]);
 
+  const [activeProjectType, setActiveProjectType] = useState(() =>
+    localStorage.getItem("activeProjectType")
+  );
   useEffect(() => {
-    if (activeProjectType) {
+    if (activeProjectType)
       localStorage.setItem("activeProjectType", activeProjectType);
-    } else {
-      localStorage.removeItem("activeProjectType");
-    }
+    else localStorage.removeItem("activeProjectType");
   }, [activeProjectType]);
-  // --- PRIMER useEffect: Sincroniza la sesión con Supabase ---
+
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setLoadingAuth(false);
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription?.unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
-  // --- SEGUNDO useEffect: Reacciona a la sesión para obtener y validar el perfil ---
+  // Efecto #2: Reacciona a los cambios en 'session' para obtener y validar el perfil.
   useEffect(() => {
-    setAuthError(null);
-
-    if (session) {
-      const fetchAndValidateProfile = async () => {
-        try {
+    const fetchProfileAndSetUser = async () => {
+      try {
+        setAuthError(null);
+        if (session) {
           const { data: userProfile, error } = await supabase
             .from("usuarios")
             .select("*")
@@ -71,38 +62,32 @@ export const UserProvider = ({ children }) => {
 
           if (error) throw error;
 
-          // --- LÓGICA DE VALIDACIÓN CENTRALIZADA ---
-          if (userProfile.estado !== "aceptado") {
-            let errorMessage = "Estado de cuenta inválido. Contacta a soporte.";
-            if (userProfile.estado === "pendiente") {
-              errorMessage =
-                "Tu cuenta está pendiente de aprobación. Te avisaremos cuando esté lista.";
-            } else if (userProfile.estado === "rechazado") {
-              errorMessage = "Tu solicitud de acceso fue rechazada.";
-            }
-            // Comunicamos el error a través de nuestro nuevo estado
+          if (userProfile.estado === "aceptado") {
+            setUser({ ...session.user, ...userProfile });
+          } else {
+            let errorMessage = "Tu cuenta tiene un estado inválido.";
+            if (userProfile.estado === "pendiente") errorMessage = "Tu cuenta está pendiente de aprobación.";
+            if (userProfile.estado === "rechazado") errorMessage = "Tu solicitud de acceso fue rechazada.";
+            
             setAuthError(errorMessage);
             await supabase.auth.signOut();
-            return null;
+            setUser(null);
           }
-
-          return { ...session.user, ...userProfile };
-        } catch (error) {
-          console.error("Error al obtener perfil:", error);
-          setAuthError("No se pudo encontrar tu perfil de usuario.");
-          await supabase.auth.signOut();
-          return null;
+        } else {
+          setUser(null);
         }
-      };
-
-      fetchAndValidateProfile().then((profile) => {
-        setUser(profile);
-      });
-    } else {
-      setUser(null);
-    }
+      } catch (error) {
+        console.error("Error al procesar el perfil:", error);
+        setUser(null);
+      } finally {
+        setLoadingAuth(false);
+      }
+    };
+    
+    fetchProfileAndSetUser();
   }, [session]);
   
+
   useEffect(() => {
     if (!user) {
       localStorage.removeItem("activeProjectId");
@@ -112,7 +97,7 @@ export const UserProvider = ({ children }) => {
     }
   }, [user]);
 
-  // La función de login es ahora MUY simple
+
   const login = async ({ email, password }) => {
     return await supabase.auth.signInWithPassword({ email, password });
   };
@@ -121,9 +106,7 @@ export const UserProvider = ({ children }) => {
     await supabase.auth.signOut();
   };
 
-  const clearAuthError = () => {
-    setAuthError(null);
-  };
+  const clearAuthError = () => setAuthError(null);
 
   const setCurrentActiveProject = (projectId, projectType) => {
     setActiveProjectId(projectId);
@@ -143,9 +126,10 @@ export const UserProvider = ({ children }) => {
     login,
     logout,
     ROLES,
-    clearActiveProject,
+    activeProjectId,
     setCurrentActiveProject,
-    activeProjectId
+    clearActiveProject,
+    activeProjectType,
   };
 
   return (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,26 +14,23 @@ const LoginPage = () => {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(""); // Estado para errores del formulario
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
-    // Si aparece un error de lógica de negocio en el contexto...
     if (authError) {
-      setError(authError); // Lo mostramos en el formulario
+      setError(authError); 
       toast({
-        // Y en una notificación
         title: "Acceso Denegado",
         description: authError,
         variant: "destructive",
         duration: 7000,
       });
-      clearAuthError(); // Limpiamos el error para que no vuelva a aparecer
+      clearAuthError();
     }
   }, [authError, clearAuthError, toast]);
 
-  // useEffect para el mensaje de registro exitoso (este ya lo tenías)
   useEffect(() => {
     if (location.state?.message) {
       toast({
@@ -51,7 +48,6 @@ const LoginPage = () => {
     setError("");
     setIsLoading(true);
 
-    // El submit ahora solo se preocupa de errores de bajo nivel (ej. contraseña)
     const { error: signInError } = await login({ email, password });
 
     setIsLoading(false);
@@ -64,7 +60,6 @@ const LoginPage = () => {
       }
       setError(displayError);
     }
-    // Ya no hay 'else'. Si el login es exitoso, los useEffects se encargan de todo.
   };
 
   return (

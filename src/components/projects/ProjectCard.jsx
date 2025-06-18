@@ -47,30 +47,30 @@ export const projectStatusOptions = [
     label: "En Proceso",
     icon: <Loader className="animate-spin" />,
     badgeClasses:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
-    borderClasses: "border-yellow-500",
-    leftBarClasses: "bg-yellow-500",
-    iconColor: "text-yellow-500",
+      "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+    borderClasses: "border-green-500",
+    leftBarClasses: "bg-green-500",
+    iconColor: "text-green-500",
   },
   {
     value: "Pausado",
     label: "Pausado",
     icon: <PauseCircle />,
     badgeClasses:
-      "bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300",
-    borderClasses: "border-violet-500",
-    leftBarClasses: "bg-violet-500",
-    iconColor: "text-violet-500",
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+    borderClasses: "border-yellow-500",
+    leftBarClasses: "bg-yellow-500",
+    iconColor: "text-yellow-500",
   },
   {
     value: "Finalizada",
     label: "Finalizada",
     icon: <CheckCircle />,
     badgeClasses:
-      "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
-    borderClasses: "border-green-500",
-    leftBarClasses: "bg-green-500",
-    iconColor: "text-green-500",
+      "bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300",
+    borderClasses: "border-violet-500",
+    leftBarClasses: "bg-violet-500",
+    iconColor: "text-violet-500",
   },
   {
     value: "Cancelado",
@@ -127,7 +127,7 @@ const ProjectCard = ({
             className={cn(
               "bg-card p-4 rounded-xl shadow-lg border relative overflow-hidden cursor-pointer",
               "transition-shadow duration-300",
-              "hover:shadow-lg hover:shadow-primary/20",
+              "hover:shadow-xl hover:shadow-lime-600",
               statusStyle.borderClasses,
               isInactivo && "opacity-60 grayscale"
             )}

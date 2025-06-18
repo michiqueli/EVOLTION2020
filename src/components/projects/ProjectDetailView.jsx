@@ -39,8 +39,6 @@ const ProjectDetailView = ({ isOpen, onOpenChange, project }) => {
       )}&key=${import.meta.env.VITE_MAPS_API_KEY}`
     : null;
 
-  console.log("Google Maps Embed URL:", googleMapsEmbedUrl); // Para depuración
-
   const getFileIcon = (fileName) => {
     if (fileName.endsWith(".pdf"))
       return <FileText className="h-5 w-5 text-red-500" />;
