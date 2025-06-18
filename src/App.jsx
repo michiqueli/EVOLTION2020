@@ -4,9 +4,12 @@ import {
   Routes,
   Route,
   Navigate,
+  Outlet,
+  useLocation,
 } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import Layout from "@/components/Layout";
-import { Toaster } from '@/components/ui/toaster';
+import { Toaster } from "@/components/ui/toaster";
 import DashboardPage from "@/pages/DashboardPage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import ActivitiesPage from "@/pages/ActivitiesPage";
@@ -24,15 +27,31 @@ import AbsenceManagementPage from "@/pages/hr/AbsenceManagementPage";
 import { UserProvider, useUser, ROLES } from "@/contexts/UserContext";
 import PlanningPage from "@/pages/PlanningPage";
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user } = useUser();
-  if (!user) {
-    return <Navigate to="/login" replace />;
+const ProtectedRoute = ({ allowedRoles }) => {
+  const { user, loadingAuth } = useUser();
+  const location = useLocation();
+
+  if (loadingAuth && !user) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-background">
+        <Loader2 className="h-12 w-12 text-primary animate-spin" />
+      </div>
+    );
   }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
   if (allowedRoles && !allowedRoles.includes(user.rol)) {
     return <Navigate to="/dashboard" replace />;
   }
-  return children;
+
+  return (
+    <Layout>
+      <Outlet />
+    </Layout>
+  );
 };
 
 const AppContent = () => {
@@ -41,162 +60,80 @@ const AppContent = () => {
   return (
     <>
       <Routes>
+        {/* --- Rutas Públicas --- */}
         <Route
-          path="/"
+          path="/login"
           element={!user ? <LoginPage /> : <Navigate to="/dashboard" replace />}
         />
-        <Route path="/register" element={<RegisterPage />} />
         <Route
-          path="/dashboard"
+          path="/register"
           element={
-            <ProtectedRoute>
-              <Layout>
-                <DashboardPage />
-              </Layout>
-            </ProtectedRoute>
+            !user ? <RegisterPage /> : <Navigate to="/dashboard" replace />
           }
         />
+
+        {/* --- Ruta Raíz: Redirige si ya está logueado --- */}
         <Route
-          path="/projects"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <ProjectsPage />
-              </Layout>
-            </ProtectedRoute>
-          }
+          path="/"
+          element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
         />
+
+        {/* --- RUTAS PROTEGIDAS AGRUPADAS --- */}
+        {/* Todas las rutas dentro de este bloque estarán protegidas por ProtectedRoute */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/planning" element={<PlanningPage />} />
+          <Route path="/activities" element={<ActivitiesPage />} />
+          <Route
+            path="/tracking"
+            element={<ProjectSelectionForTrackingPage />}
+          />
+          <Route
+            path="/tracking/:projectId"
+            element={<ProjectTrackingPage />}
+          />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/assistant" element={<AssistantPage />} />
+        </Route>
+
+        {/* --- Rutas Protegidas con ROLES específicos --- */}
         <Route
-          path="/planning"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <PlanningPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
+          element={<ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.CEO]} />}
+        >
+          <Route path="/library" element={<LibraryPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+        </Route>
+
         <Route
-          path="/activities"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <ActivitiesPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/tracking"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <ProjectSelectionForTrackingPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/tracking/:projectId"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <ProjectTrackingPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/library"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.CEO]}>
-              <Layout>
-                <LibraryPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/assistant"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <AssistantPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.CEO]}>
-              <Layout>
-                <ReportsPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <ProfilePage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        {/* HR Routes */}
-        <Route
-          path="/hr/resources"
           element={
             <ProtectedRoute
               allowedRoles={[ROLES.ADMIN, ROLES.CEO, ROLES.DEVELOPER]}
-            >
-              <Layout>
-                <ResourcesManagementPage />
-              </Layout>
-            </ProtectedRoute>
+            />
           }
-        />
+        >
+          <Route path="/hr/resources" element={<ResourcesManagementPage />} />
+        </Route>
+
         <Route
-          path="/hr/time-tracking"
           element={
             <ProtectedRoute
               allowedRoles={[
                 ROLES.ADMIN,
                 ROLES.CEO,
-                ROLES.WORKER,
                 ROLES.DEVELOPER,
-              ]}
-            >
-              <Layout>
-                <TimeTrackingPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/hr/absences"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                ROLES.ADMIN,
-                ROLES.CEO,
                 ROLES.WORKER,
-                ROLES.DEVELOPER,
               ]}
-            >
-              <Layout>
-                <AbsenceManagementPage />
-              </Layout>
-            </ProtectedRoute>
+            />
           }
-        />
-        <Route
-          path="*"
-          element={<Navigate to={user ? "/dashboard" : "/"} replace />}
-        />
+        >
+          <Route path="/hr/time-tracking" element={<TimeTrackingPage />} />
+          <Route path="/hr/absences" element={<AbsenceManagementPage />} />
+        </Route>
+
+        {/* --- Ruta 404 (Opcional pero recomendada) --- */}
+        {/* Ya no redirige, sino que puede mostrar una página de "No Encontrado" */}
+        <Route path="*" element={<h1>404: Página No Encontrada</h1>} />
       </Routes>
       <Toaster />
     </>

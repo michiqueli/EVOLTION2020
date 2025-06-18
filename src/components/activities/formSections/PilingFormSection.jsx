@@ -1,50 +1,26 @@
-
 import React from 'react';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Image as ImageIcon } from 'lucide-react';
 
-const PilingFormSection = ({ formData, handleInputChange, disabled }) => (
-  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-    <div>
-      <Label htmlFor="hincas" className="text-foreground">Hincas Realizadas</Label>
-      <Input 
-        type="number" 
-        name="hincas" 
-        id="hincas" 
-        value={formData.hincas || ''} 
-        onChange={handleInputChange} 
-        className="mt-1 bg-background border-input" 
-        placeholder="Número de hincas" 
-        disabled={disabled} 
-      />
-    </div>
-    <div>
-      <Label htmlFor="predrilling" className="text-foreground">Predrilling</Label>
-      <Input 
-        type="number" 
-        name="predrilling" 
-        id="predrilling" 
-        value={formData.predrilling || ''} 
-        onChange={handleInputChange} 
-        className="mt-1 bg-background border-input" 
-        placeholder="Cantidad" 
-        disabled={disabled} 
-      />
-    </div>
-    <div>
-      <Label htmlFor="reparto_hincas" className="text-foreground">Reparto de Hincas</Label>
-      <Input 
-        type="number" 
-        name="reparto_hincas" 
-        id="reparto_hincas" 
-        value={formData.reparto_hincas || ''} 
-        onChange={handleInputChange} 
-        className="mt-1 bg-background border-input" 
-        placeholder="Cantidad" 
-        disabled={disabled} 
-      />
-    </div>
-  </div>
-);
+const PilingForm = ({ formData, handleInputChange, isSubmitting }) => {
+  return (
+    <>
+      <div>
+        <Label htmlFor="pilesDriven" className="text-foreground">Cantidad: Hincas realizadas</Label>
+        <Input type="number" name="pilesDriven" id="pilesDriven" value={formData.pilesDriven || ''} onChange={handleInputChange} className="mt-1 bg-background border-input" placeholder="Cantidad en Unidades (Solo números)" disabled={isSubmitting}/>
+      </div>
+      <div>
+        <Label htmlFor="predrillingDone" className="text-foreground">Cantidad: Predrilling Realizados</Label>
+        <Input type="number" name="predrillingDone" id="predrillingDone" value={formData.predrillingDone || ''} onChange={handleInputChange} className="mt-1 bg-background border-input" placeholder="Cantidad en Unidades (Solo números)" disabled={isSubmitting}/>
+      </div>
+      <div>
+        <Label htmlFor="pilesDistributed" className="text-foreground">Cantidad: Reparto de hincas</Label>
+        <Input type="number" name="pilesDistributed" id="pilesDistributed" value={formData.pilesDistributed || ''} onChange={handleInputChange} className="mt-1 bg-background border-input" placeholder="Cantidad en Unidades (Solo números)" disabled={isSubmitting}/>
+      </div>
+    </>
+  );
+};
 
-export default PilingFormSection;
+export default PilingForm;
