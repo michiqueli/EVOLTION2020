@@ -31,7 +31,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useUser, ROLES } from "@/contexts/UserContext";
 
@@ -201,7 +201,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       }
     >
       <Icon className={cn("h-6 w-6 flex-shrink-0", !isOpen && "h-7 w-7")} />
-      <AnimatePresence>
         {isOpen && (
           <motion.span
             initial={{ opacity: 0, width: 0 }}
@@ -213,7 +212,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {label}
           </motion.span>
         )}
-      </AnimatePresence>
     </NavLink>
   );
 
@@ -347,7 +345,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     : "U"}
                 </AvatarFallback>
               </Avatar>
-              <AnimatePresence>
                 {isOpen && (
                   <motion.div
                     initial={{ opacity: 0, width: 0, marginLeft: 0 }}
@@ -368,7 +365,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     </span>
                   </motion.div>
                 )}
-              </AnimatePresence>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent

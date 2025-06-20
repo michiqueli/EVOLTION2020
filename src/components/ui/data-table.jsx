@@ -25,7 +25,7 @@ import {
   ChevronsRight,
   ArrowUpDown,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 const getNestedValue = (obj, path) => {
   if (!path) return undefined;
@@ -37,6 +37,7 @@ const DataTable = ({
   data,
   filterableColumns = [],
   searchableColumns = [],
+  onFilteredDataChange,
 }) => {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -46,14 +47,6 @@ const DataTable = ({
     key: null,
     direction: "ascending",
   });
-
-  // --- LA SOLUCIÓN DEFINITIVA (useEffect con TODAS las dependencias) ---
-  useEffect(() => {
-    // Si los datos o la forma en que podemos filtrar cambian, reseteamos todo a cero.
-    setPageIndex(0);
-    setSearchTerm("");
-    setFilters({});
-  }, [data, searchableColumns, filterableColumns]);
 
   const sortedData = useMemo(() => {
     let sortableData = [...data];
@@ -83,14 +76,24 @@ const DataTable = ({
               );
             })
           : true;
+
       const filterMatch = Object.entries(filters).every(([key, value]) => {
         if (value === "") return true;
         const val = getNestedValue(item, key);
-        return val && val.toString().toLowerCase() === value.toLowerCase();
+        return (
+          val != null && val.toString().toLowerCase() === value.toLowerCase()
+        );
       });
+
       return searchMatch && filterMatch;
     });
   }, [sortedData, searchTerm, filters, searchableColumns]);
+
+  useEffect(() => {
+    if (onFilteredDataChange) {
+      onFilteredDataChange(filteredData);
+    }
+  }, [JSON.stringify(filteredData), onFilteredDataChange]);
 
   const pageCount = Math.ceil(filteredData.length / pageSize);
   const paginatedData = filteredData.slice(
@@ -198,35 +201,33 @@ const DataTable = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            <AnimatePresence>
-              {paginatedData.length > 0 ? (
-                paginatedData.map((row, rowIndex) => (
-                  <motion.tr
-                    key={row.id || rowIndex}
-                    layout
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="border-b data-[state=selected]:bg-muted"
-                  >
-                    {columns.map((column) => (
-                      <TableCell key={column.accessor}>
-                        {getCellValue(row, column)}
-                      </TableCell>
-                    ))}
-                  </motion.tr>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No hay resultados.
-                  </TableCell>
-                </TableRow>
-              )}
-            </AnimatePresence>
+            {paginatedData.length > 0 ? (
+              paginatedData.map((row, rowIndex) => (
+                <motion.tr
+                  key={row.id || rowIndex}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="border-b data-[state=selected]:bg-muted"
+                >
+                  {columns.map((column) => (
+                    <TableCell key={column.accessor}>
+                      {getCellValue(row, column)}
+                    </TableCell>
+                  ))}
+                </motion.tr>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  No hay resultados.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>

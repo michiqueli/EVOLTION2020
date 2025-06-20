@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-const DashboardStatCard = ({ title, value, icon, color, description, hoverColor, isVisible = true }) => {
+export const StatCard = ({ title, value, icon, color, description, hoverColor, isVisible = true }) => {
   if (!isVisible) return null;
   return (
   <motion.div
@@ -22,5 +22,3 @@ const DashboardStatCard = ({ title, value, icon, color, description, hoverColor,
   </motion.div>
   );
 };
-
-export default DashboardStatCard;

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const DashboardActionCard = ({ title, description, icon: Icon, onClick, className, badge, badgeColor }) => {
+export const ActionCard = ({ title, description, icon: Icon, onClick, className, badge, badgeColor }) => {
   return (
     <motion.div
       className={cn(
@@ -42,5 +42,3 @@ const DashboardActionCard = ({ title, description, icon: Icon, onClick, classNam
     </motion.div>
   );
 };
-
-export default DashboardActionCard;

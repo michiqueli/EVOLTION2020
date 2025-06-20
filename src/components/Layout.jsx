@@ -3,7 +3,7 @@ import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import Sidebar from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useUser } from '@/contexts/UserContext';
 
 const Layout = ({ children }) => {
@@ -27,10 +27,6 @@ const Layout = ({ children }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
   return (
     <div className="flex h-screen bg-background text-foreground">
       <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
@@ -47,7 +43,6 @@ const Layout = ({ children }) => {
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-6">
-          <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
               initial={{ opacity: 0, y: 20 }}
@@ -57,7 +52,6 @@ const Layout = ({ children }) => {
             >
               {children ? children : <Outlet />}
             </motion.div>
-          </AnimatePresence>
         </main>
       </div>
     </div>

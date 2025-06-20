@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/components/ui/use-toast";
@@ -104,7 +104,6 @@ const ProjectSelectionForTrackingPage = () => {
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           layout
         >
-          <AnimatePresence>
             {filteredProjects.map(project => (
               <ProjectCard
                 key={project.uuid_id}
@@ -113,7 +112,6 @@ const ProjectSelectionForTrackingPage = () => {
                 isSelectionMode={true}
               />
             ))}
-          </AnimatePresence>
         </motion.div>
       ) : (
         <div className="rounded-lg border border-dashed border-border p-12 text-center mt-8">

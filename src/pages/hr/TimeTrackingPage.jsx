@@ -29,7 +29,10 @@ import {
   Edit,
   PlusCircle,
   Loader2,
+  FileDown,
+  Clock
 } from "lucide-react";
+import { exportTimeEntriesToExcel } from "@/lib/exportTimersToExcel";
 
 const TimeTrackingPage = () => {
   const { user, activeProjectId, setCurrentActiveProject } = useUser();
@@ -39,10 +42,11 @@ const TimeTrackingPage = () => {
   const [currentEntry, setCurrentEntry] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTimer, setActiveTimer] = useState(null);
-
+  const [filteredTimeEntries, setFilteredTimeEntries] = useState([]);
   const [quickStartNotes, setQuickStartNotes] = useState("");
   const [isOtherProject, setIsOtherProject] = useState(false);
   const [otherProjectDetails, setOtherProjectDetails] = useState("");
+  const [elapsedTime, setElapsedTime] = useState("00:00:00");
 
   const [modalFormData, setModalFormData] = useState({
     project_id: "",
@@ -122,6 +126,27 @@ const TimeTrackingPage = () => {
     fetchProjects();
   }, [fetchTimeEntries, fetchProjects]);
 
+  useEffect(() => {
+    let intervalId;
+    if (activeTimer) {
+      const runningEntry = timeEntries.find((e) => e.id === activeTimer);
+
+      if (runningEntry) {
+        const startTime = new Date(runningEntry.start_time);
+        intervalId = setInterval(() => {
+          const now = new Date();
+          const elapsed = now - startTime;
+          setElapsedTime(formatDuration(elapsed));
+        }, 1000);
+      }
+    }
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [activeTimer, timeEntries]);
+
   const handleActiveProjectChange = (projectId) => {
     if (projectId === "OTROS") {
       setIsOtherProject(true);
@@ -140,13 +165,11 @@ const TimeTrackingPage = () => {
       }
     }
   };
-
-  // --- FUNCIÓN AUXILIAR para convertir fechas a formato local ---
   const toLocalISOString = (dateString) => {
     if (!dateString) return "";
 
     const date = new Date(dateString);
-    const tzoffset = new Date().getTimezoneOffset() * 60000; //offset in milliseconds
+    const tzoffset = new Date().getTimezoneOffset() * 60000;
     const localISOTime = new Date(date.getTime() - tzoffset)
       .toISOString()
       .slice(0, 16);
@@ -160,7 +183,7 @@ const TimeTrackingPage = () => {
       toast({
         title: "Acción Requerida",
         description: "Por favor, selecciona un proyecto para iniciar.",
-        variant: "default",
+        variant: "destructive",
       });
       return;
     }
@@ -168,7 +191,7 @@ const TimeTrackingPage = () => {
       toast({
         title: "Acción Requerida",
         description: "Añade los detalles del proyecto 'OTROS'.",
-        variant: "default",
+        variant: "destructive",
       });
       return;
     }
@@ -211,8 +234,8 @@ const TimeTrackingPage = () => {
     if (!activeTimer) {
       toast({
         title: "Error",
-        description: "No hay ningún fichaje activo para detener.",
-        variant: "warning",
+        description: "No hay ningún fichaje activo.",
+        variant: "destructive",
       });
       return;
     }
@@ -220,87 +243,94 @@ const TimeTrackingPage = () => {
     setIsLoading(true);
 
     try {
-      // --- PASO 1: Detener el fichaje y obtener la fila actualizada ---
-      // Usamos .select() para que Supabase nos devuelva el registro completo que acabamos de actualizar.
-      const { data: stoppedEntry, error: stopError } = await supabase
+      // --- PASO 1: Obtenemos el fichaje activo para saber su hora de inicio ---
+      const { data: activeEntry, error: fetchError } = await supabase
         .from("time_tracking")
-        .update({ end_time: new Date().toISOString() })
+        .select("start_time, project_id")
         .eq("id", activeTimer)
-        .select()
         .single();
 
-      if (stopError) {
-        // Si falla al detener el timer, lanzamos un error para detener todo el proceso.
-        throw new Error(`No se pudo detener el fichaje: ${stopError.message}`);
+      if (fetchError || !activeEntry) {
+        throw new Error(
+          "No se pudo encontrar el fichaje activo para detenerlo."
+        );
       }
 
-      toast({ title: "Fichaje Detenido", variant: "success" });
-      setActiveTimer(null);
-      fetchTimeEntries(); // Refrescamos la lista de fichajes
+      // --- PASO 2: Calculamos la duración ---
+      const startTime = new Date(activeEntry.start_time);
+      const endTime = new Date();
 
-      // --- PASO 2: Calcular la duración y actualizar el proyecto ---
-      // Verificamos que el fichaje detenido tenga un project_id (no sea un proyecto "OTROS")
-      if (stoppedEntry && stoppedEntry.project_id) {
-        const startTime = new Date(stoppedEntry.start_time);
-        const endTime = new Date(stoppedEntry.end_time);
+      const durationInMilliseconds = endTime - startTime;
+      const workedHours = durationInMilliseconds / (1000 * 60 * 60);
 
-        // Calculamos la duración en milisegundos y la convertimos a horas
-        const durationInMilliseconds = endTime - startTime;
-        const durationInHours = durationInMilliseconds / (1000 * 60 * 60);
+      const { error: updateError } = await supabase
+        .from("time_tracking")
+        .update({
+          end_time: endTime.toISOString(),
+          work_time: workedHours,
+        })
+        .eq("id", activeTimer);
 
-        console.log(
-          `Duración calculada: ${durationInHours.toFixed(
-            2
-          )} horas para el proyecto ${stoppedEntry.project_id}`
+      if (updateError) {
+        throw new Error(
+          `No se pudo actualizar el fichaje: ${updateError.message}`
         );
+      }
 
-        // --- PASO 3: Obtener las horas actuales del proyecto y restarle la duración ---
+      toast({
+        title: "Fichaje Detenido",
+        description: `Tiempo trabajado: ${workedHours.toFixed(2)} horas.`,
+        variant: "success",
+      });
 
-        // Primero, obtenemos el valor actual de 'horas' del proyecto
-        const { data: projectData, error: fetchError } = await supabase
+      if (activeEntry.project_id) {
+        const { data: projectData, error: projectFetchError } = await supabase
           .from("proyectos")
-          .select("horas")
-          .eq("uuid_id", stoppedEntry.project_id) // Asumiendo que project_id es el uuid
+          .select("horas, nombre")
+          .eq("uuid_id", activeEntry.project_id)
           .single();
 
-        if (fetchError) {
-          throw new Error(
-            `No se pudo encontrar el proyecto para actualizar horas: ${fetchError.message}`
-          );
+        if (projectFetchError) {
+          toast({
+            title: "Advertencia",
+            description:
+              "No se pudo encontrar el proyecto para actualizar sus horas.",
+            variant: "destructive",
+          });
+        } else {
+          const currentHours = projectData.horas;
+          const newHours = currentHours + workedHours;
+          const { error: updateProjectError } = await supabase
+            .from("proyectos")
+            .update({ horas: newHours })
+            .eq("uuid_id", activeEntry.project_id);
+
+          if (updateProjectError) {
+            toast({
+              title: "Advertencia",
+              description: "No se pudieron actualizar las horas del proyecto.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Horas de Proyecto Actualizadas",
+              description: `Se sumaron ${workedHours.toFixed(
+                2
+              )} horas del proyecto "${projectData.nombre}".`,
+              variant: "success",
+            });
+          }
         }
-
-        const currentHours = projectData.horas;
-        const newHours = currentHours + durationInHours;
-
-        // Finalmente, actualizamos el proyecto con el nuevo total de horas
-        const { error: updateProjectError } = await supabase
-          .from("proyectos")
-          .update({ horas: newHours })
-          .eq("uuid_id", stoppedEntry.project_id);
-
-        if (updateProjectError) {
-          throw new Error(
-            `No se pudieron actualizar las horas del proyecto: ${updateProjectError.message}`
-          );
-        }
-
-        toast({
-          title: "Horas de Proyecto Actualizadas",
-          description: `Se descontaron ${durationInHours.toFixed(
-            2
-          )} horas del proyecto.`,
-          variant: "info",
-        });
       }
+      setActiveTimer(null);
+      fetchTimeEntries();
     } catch (error) {
-      // Un único lugar para manejar todos los posibles errores del proceso
       toast({
         title: "Ocurrió un Error",
         description: error.message,
         variant: "destructive",
       });
     } finally {
-      // Este bloque se ejecuta siempre, garantizando que el loading se desactive
       setIsLoading(false);
     }
   };
@@ -329,6 +359,7 @@ const TimeTrackingPage = () => {
       date: new Date().toISOString().split("T")[0],
       start_time: "",
       end_time: "",
+      work_time: "",
       is_other_project: false,
       other_project_details: "",
       notes: "",
@@ -350,7 +381,7 @@ const TimeTrackingPage = () => {
       date: entry.date,
       start_time: entry.start_time ? toLocalISOString(entry.start_time) : "",
       end_time: entry.end_time ? toLocalISOString(entry.end_time) : "",
-
+      work_time: entry.work_time ? toLocalISOString(entry.work_time) : "",
       is_other_project: entry.is_other_project,
       other_project_details: entry.other_project_details || "",
       notes: entry.notes || "",
@@ -358,10 +389,15 @@ const TimeTrackingPage = () => {
     setIsModalOpen(true);
   };
 
-  // En tu componente TimeTrackingPage.jsx...
+  const formatDuration = (milliseconds) => {
+  if (milliseconds < 0) milliseconds = 0;
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+};
 
-  // --- NUEVA FUNCIÓN AUXILIAR 1: Para calcular la duración en horas ---
-  // Devuelve 0 si no hay hora de fin, para que no afecte los cálculos.
   const calculateDurationInHours = (startTime, endTime) => {
     if (!startTime || !endTime) {
       return 0;
@@ -369,21 +405,15 @@ const TimeTrackingPage = () => {
     const start = new Date(startTime);
     const end = new Date(endTime);
     const durationInMilliseconds = end - start;
-    // Retorna el valor en horas, o 0 si el cálculo es inválido (ej. end < start)
     return Math.max(0, durationInMilliseconds / (1000 * 60 * 60));
   };
 
-  // --- NUEVA FUNCIÓN AUXILIAR 2: Para actualizar las horas de un proyecto ---
-  // 'hoursToAdjust' puede ser positivo (para sumar) o negativo (para restar).
   const updateProjectHours = async (projectId, hoursToAdjust) => {
     if (!projectId || hoursToAdjust === 0) {
-      return; // No hacemos nada si no hay proyecto o el ajuste es cero.
+      return;
     }
 
     try {
-      // Obtenemos las horas actuales del proyecto. Es una operación atómica en la DB.
-      // NOTA: Para máxima robustez en un entorno de alta concurrencia, esto se haría
-      // con una función RPC en la base de datos, pero este enfoque es excelente para la mayoría de los casos.
       const { data: project, error: fetchError } = await supabase
         .from("proyectos")
         .select("horas, nombre")
@@ -395,7 +425,7 @@ const TimeTrackingPage = () => {
           `No se pudo obtener el proyecto para ajustar horas: ${fetchError.message}`
         );
 
-      const newHours = project.horas + hoursToAdjust; // Restamos porque hoursToAdjust representa el "gasto"
+      const newHours = project.horas + hoursToAdjust;
 
       const { error: updateError } = await supabase
         .from("proyectos")
@@ -411,7 +441,6 @@ const TimeTrackingPage = () => {
         `Horas del proyecto "${project.nombre}" actualizadas correctamente.`
       );
     } catch (error) {
-      // Si la actualización de horas falla, lo notificamos pero no detenemos el flujo principal.
       toast({
         title: "Error al actualizar horas",
         description: error.message,
@@ -420,7 +449,6 @@ const TimeTrackingPage = () => {
     }
   };
 
-  // --- TU FUNCIÓN handleModalSubmit TOTALMENTE REFACTORIZADA ---
   const handleModalSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -428,14 +456,11 @@ const TimeTrackingPage = () => {
     try {
       // --- LÓGICA PARA EDITAR UN FICHAJE EXISTENTE ---
       if (currentEntry) {
-        // 1. Calculamos la duración ORIGINAL del fichaje (antes de editar)
         const oldDuration = calculateDurationInHours(
           currentEntry.start_time,
           currentEntry.end_time
         );
         const oldProjectId = currentEntry.project_id;
-
-        // 2. Preparamos y guardamos los NUEVOS datos del fichaje
         const dataToSave = {
           project_id: modalFormData.is_other_project
             ? null
@@ -445,6 +470,10 @@ const TimeTrackingPage = () => {
           end_time: modalFormData.end_time
             ? new Date(modalFormData.end_time).toISOString()
             : null,
+          work_time: calculateDurationInHours(
+            modalFormData.start_time,
+            modalFormData.end_time
+          ),
           is_other_project: modalFormData.is_other_project,
           other_project_details: modalFormData.is_other_project
             ? modalFormData.other_project_details
@@ -460,29 +489,23 @@ const TimeTrackingPage = () => {
           .select()
           .single();
 
-        if (error) throw error; // Si falla aquí, no continuamos.
+        if (error) throw error;
 
-        // 3. Calculamos la NUEVA duración
         const newDuration = calculateDurationInHours(
           updatedEntry.start_time,
           updatedEntry.end_time
         );
         const newProjectId = updatedEntry.project_id;
 
-        // 4. Lógica de ajuste de horas
         if (oldProjectId === newProjectId) {
-          // El proyecto no cambió, solo ajustamos la diferencia
           const durationDelta = newDuration - oldDuration;
           if (newProjectId) {
             await updateProjectHours(newProjectId, durationDelta);
           }
         } else {
-          // ¡El proyecto cambió!
-          // Devolvemos las horas al proyecto antiguo
           if (oldProjectId) {
-            await updateProjectHours(oldProjectId, -oldDuration); // Sumamos las horas de vuelta
+            await updateProjectHours(oldProjectId, -oldDuration);
           }
-          // Restamos las horas del proyecto nuevo
           if (newProjectId) {
             await updateProjectHours(newProjectId, newDuration);
           }
@@ -490,7 +513,6 @@ const TimeTrackingPage = () => {
 
         toast({ title: "Fichaje Actualizado", variant: "success" });
       } else {
-        // --- LÓGICA PARA CREAR UN NUEVO FICHAJE MANUAL ---
         const dataToSave = {
           user_id: user.id,
           project_id: modalFormData.is_other_project
@@ -501,6 +523,10 @@ const TimeTrackingPage = () => {
           end_time: modalFormData.end_time
             ? new Date(modalFormData.end_time).toISOString()
             : null,
+          work_time: calculateDurationInHours(
+            modalFormData.start_time,
+            modalFormData.end_time
+          ),
           is_other_project: modalFormData.is_other_project,
           other_project_details: modalFormData.is_other_project
             ? modalFormData.other_project_details
@@ -515,8 +541,6 @@ const TimeTrackingPage = () => {
           .single();
 
         if (error) throw error;
-
-        // Si se creó un fichaje ya cerrado, calculamos y restamos las horas
         const duration = calculateDurationInHours(
           newEntry.start_time,
           newEntry.end_time
@@ -527,8 +551,6 @@ const TimeTrackingPage = () => {
 
         toast({ title: "Fichaje Creado", variant: "success" });
       }
-
-      // Al final, si todo fue bien, refrescamos y cerramos
       fetchTimeEntries();
       resetModalFormAndClose();
     } catch (error) {
@@ -567,13 +589,28 @@ const TimeTrackingPage = () => {
           : "En curso",
       sortable: true,
     },
+    {
+      header: "Tiempo Trabajado",
+      accessor: "work_time",
+      cell: ({ row }) => {
+        if (row.end_time) {
+          const hours = row.work_time;
+          if (typeof hours === "number") {
+            return `${hours.toFixed(2)} hs`;
+          }
+          return "N/A";
+        }
+        return "En curso";
+      },
+      sortable: true,
+    },
     { header: "Notas", accessor: "notes" },
   ];
 
   if (isAdmin) {
     columns.unshift({
       header: "Usuario",
-      accessor: "usuarios.nombre",
+      accessor: "autor.nombre",
       cell: ({ row }) => row.autor?.nombre || "Desconocido",
       sortable: true,
     });
@@ -592,6 +629,35 @@ const TimeTrackingPage = () => {
       ),
     });
   }
+
+  const handleExportToExcel = async () => {
+    setIsLoading(true);
+    try {
+      const buffer = await exportTimeEntriesToExcel(filteredTimeEntries);
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      saveAs(
+        blob,
+        `control_horario_${new Date().toISOString().split("T")[0]}.xlsx`
+      );
+
+      toast({
+        title: "Exportación Exitosa",
+        description: "El archivo de control horario ha sido generado.",
+        variant: "success",
+      });
+    } catch (error) {
+      console.error("Error al exportar a Excel:", error);
+      toast({
+        title: "Error de Exportación",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <motion.div
@@ -612,21 +678,37 @@ const TimeTrackingPage = () => {
               <PlayCircle className="h-5 w-5" /> Iniciar Jornada
             </Button>
           ) : (
-            <Button
-              onClick={handleStopTimer}
-              className="bg-red-500 hover:bg-red-600 text-white shadow-lg flex items-center gap-2"
-              disabled={isLoading}
-            >
-              <StopCircle className="h-5 w-5" /> Finalizar Jornada
-            </Button>
+            <div className="flex items-center gap-4 bg-card border rounded-lg px-4 py-2">
+              <div className="flex items-center gap-2 text-lg font-mono text-primary animate-pulse">
+                <Clock className="h-5 w-5" />
+                <span>{elapsedTime}</span>
+              </div>
+              <Button
+                onClick={handleStopTimer}
+                className="bg-red-500 hover:bg-red-600 text-white shadow-lg flex items-center gap-2"
+                disabled={isLoading}
+              >
+                <StopCircle className="h-5 w-5" /> Finalizar Jornada
+              </Button>
+            </div>
           )}
           {isAdmin && (
-            <Button
-              onClick={openModalForCreate}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg flex items-center gap-2"
-            >
-              <PlusCircle className="h-5 w-5" /> Añadir de forma manual
-            </Button>
+            <>
+              <Button
+                onClick={openModalForCreate}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg flex items-center gap-2"
+              >
+                <PlusCircle className="h-5 w-5" /> Añadir de forma manual
+              </Button>
+              <Button
+                onClick={handleExportToExcel}
+                variant="outline"
+                className="flex items-center gap-2"
+                disabled={isLoading}
+              >
+                <FileDown className="h-5 w-5" /> Exportar a Excel
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -826,12 +908,18 @@ const TimeTrackingPage = () => {
         <DataTable
           columns={columns}
           data={timeEntries}
+          onFilteredDataChange={setFilteredTimeEntries}
           searchableColumns={[
             { accessor: "project_name", header: "Proyecto" },
-            { accessor: "notes", header: "Notas" },
+            { accessor: "autor.nombre", header: "Nombre" },
           ]}
           filterableColumns={
-            isAdmin ? [{ accessor: "usuarios.nombre", header: "Usuario" }] : []
+            isAdmin
+              ? [
+                  { accessor: "autor.nombre", header: "Usuario" },
+                  { accessor: "project_name", header: "Proyecto" },
+                ]
+              : [{ accessor: "project_name", header: "Proyecto" }]
           }
         />
       )}
