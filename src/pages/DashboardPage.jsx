@@ -1,14 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { ActiveTimerCard } from "@/components/dashboard/DashboardActiveTimerCard";
+import { StatCard } from "@/components/dashboard/DashboardStatCard";
+import { ActionCard } from "@/components/dashboard/DashboardActionCard";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   CalendarDays,
   PenLine as FilePenLine,
@@ -18,100 +13,55 @@ import {
   Zap,
   HardHat,
   Settings2,
-  CheckCircle,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { format, startOfWeek } from 'date-fns';
 import { useToast } from "@/components/ui/use-toast";
 
-const ActionCard = ({
-  title,
-  description,
-  icon: Icon,
-  onClick,
-  bgColor = "bg-card",
-  textColor = "text-card-foreground",
-  accentColor = "text-primary",
-}) => (
-  <motion.div
-    className={`rounded-xl border border-border ${bgColor} p-6 shadow-lg cursor-pointer h-full flex flex-col justify-between`}
-    whileHover={{
-      y: -6,
-      boxShadow:
-        "0px 10px 20px hsla(var(--primary-values)/0.2), 0px 3px 8px hsla(var(--primary-values)/0.1)",
-    }}
-    transition={{ type: "spring", stiffness: 300, damping: 15 }}
-    onClick={onClick}
-    initial={{ opacity: 0, y: 30 }}
-    animate={{ opacity: 1, y: 0 }}
-  >
-    <div>
-      <div className={`mb-4 inline-block rounded-lg p-3 bg-primary/10`}>
-        <Icon className={`h-8 w-8 ${accentColor}`} />
-      </div>
-      <h3 className={`mb-2 text-xl font-semibold ${textColor}`}>{title}</h3>
-      <p className={`text-sm text-muted-foreground`}>{description}</p>
-    </div>
-    <Button
-      variant="link"
-      className={`mt-4 p-0 self-start ${accentColor} hover:underline`}
-    >
-      Acceder
-    </Button>
-  </motion.div>
-);
-
-const StatCard = ({ title, value, icon, color, description, hoverColor }) => (
-  <motion.div
-    className={`rounded-xl border border-border bg-card p-6 shadow-lg`}
-    whileHover={{
-      y: -5,
-      boxShadow: `0 10px 15px -3px ${
-        hoverColor || "hsl(var(--primary)/0.2)"
-      }, 0 4px 6px -2px ${hoverColor || "hsl(var(--primary)/0.1)"}`,
-    }}
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5 }}
-  >
-    <div className="flex items-center justify-between">
-      <h3 className="text-lg font-semibold text-card-foreground">{title}</h3>
-      <div className={`rounded-full p-2 ${color}`}>
-        {React.createElement(icon, {
-          className: "h-6 w-6 text-primary-foreground",
-        })}
-      </div>
-    </div>
-    <p className="mt-2 text-3xl font-bold text-primary">{value}</p>
-    {description && (
-      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-    )}
-  </motion.div>
-);
-
+const formatDuration = (milliseconds) => {
+  if (!milliseconds || milliseconds < 0) return "00h 00m 00s";
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(
+    2,
+    "0"
+  )}m ${String(seconds).padStart(2, "0")}s`;
+};
 const DashboardPage = () => {
   const {
     user,
     activeProjectId,
-    activeProjectType,
     setCurrentActiveProject,
     clearActiveProject,
+    ROLES,
   } = useUser();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const isAdminOrCEO = user && (user.role === "admin" || user.role === "ceo");
-
+  const isAdminOrCEO =
+    user &&
+    (user.rol === ROLES.ADMIN ||
+      user.rol === ROLES.CEO ||
+      user.rol === ROLES.DEVELOPER);
   const [projects, setProjects] = useState([]);
   const [selectedDashboardProject, setSelectedDashboardProject] = useState(
     activeProjectId || ""
   );
+  const [activeTimerInfo, setActiveTimerInfo] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState("00h 00m 00s");
+  const [weeklyHours, setWeeklyHours] = useState(0);
+  const weeklyGoal = 40;
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchProjectsForSelect = async () => {
       const { data, error } = await supabase
         .from("proyectos")
         .select("uuid_id, nombre, project_type")
+        .eq("estado", "En Proceso")
         .order("nombre");
       if (error) {
         console.error("Error fetching projects for dashboard select:", error);
@@ -133,29 +83,77 @@ const DashboardPage = () => {
     setSelectedDashboardProject(activeProjectId || "");
   }, [activeProjectId]);
 
-  const handleProjectChange = (projectId) => {
-  if (projectId === "none") {
-    clearActiveProject();
-    setSelectedDashboardProject("");
-    toast({
-      title: "Proyecto Deseleccionado",
-      description: "No hay ningún proyecto activo seleccionado.",
-      variant: "info",
-    });
-  } else {
-    const project = projects.find((p) => p.uuid_id === projectId);
-    console.log(project)
-    if (project) {
-      setSelectedDashboardProject(projectId);
-      setCurrentActiveProject(project.uuid_id, project.project_type);
-      toast({
-        title: "Proyecto Activo Cambiado",
-        description: `Ahora estás trabajando en "${project.nombre}".`,
-        variant: "success",
-      });
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      // 2. Obtener fichajes de la semana y el fichaje activo
+      const today = new Date();
+      const weekStart = format(
+        startOfWeek(today, { weekStartsOn: 1 }),
+        "yyyy-MM-dd"
+      );
+
+      const { data: entriesData, error } = await supabase
+        .from("time_tracking")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("date", weekStart);
+
+      if (error) return;
+
+      // Calculamos horas trabajadas de la semana
+      const totalHours = entriesData
+        .filter((e) => e.work_time)
+        .reduce((sum, current) => sum + current.work_time, 0);
+      setWeeklyHours(totalHours);
+
+      // Buscamos un timer activo
+      const runningTimer = entriesData.find((e) => !e.end_time);
+      if (runningTimer) {
+        setActiveTimerInfo({
+          id: runningTimer.id,
+          start_time: runningTimer.start_time,
+        });
+      }
+    };
+    fetchInitialData();
+  }, [user.id]);
+
+  useEffect(() => {
+    let intervalId;
+    if (activeTimerInfo) {
+      const startTime = new Date(activeTimerInfo.start_time);
+      intervalId = setInterval(() => {
+        setElapsedTime(formatDuration(new Date() - startTime));
+      }, 1000);
+    } else {
+      setElapsedTime("00h 00m 00s");
     }
-  }
-};
+    return () => clearInterval(intervalId);
+  }, [activeTimerInfo]);
+
+  const handleProjectChange = (projectId) => {
+    if (projectId === "none") {
+      clearActiveProject();
+      setSelectedDashboardProject("");
+      toast({
+        title: "Proyecto Deseleccionado",
+        description: "No hay ningún proyecto activo seleccionado.",
+        variant: "info",
+      });
+    } else {
+      const project = projects.find((p) => p.uuid_id === projectId);
+      console.log(project);
+      if (project) {
+        setSelectedDashboardProject(projectId);
+        setCurrentActiveProject(project.uuid_id, project.project_type);
+        toast({
+          title: "Proyecto Activo Cambiado",
+          description: `Ahora estás trabajando en "${project.nombre}".`,
+          variant: "success",
+        });
+      }
+    }
+  };
   const actionCardVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: (i) => ({
@@ -167,6 +165,118 @@ const DashboardPage = () => {
         ease: "easeOut",
       },
     }),
+  };
+
+  const handleStartTimer = async () => {
+    // Validación para asegurar que hay un proyecto seleccionado
+    if (!activeProjectId) {
+      toast({
+        title: "Selecciona un Proyecto",
+        description: "Debes elegir un proyecto antes de iniciar un fichaje.",
+        variant: "default",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("time_tracking")
+        .insert({
+          user_id: user.id,
+          project_id: activeProjectId,
+          date: new Date().toISOString().split("T")[0],
+          start_time: new Date().toISOString(),
+        })
+        .select("id, start_time") // Pedimos que nos devuelva el nuevo ID y la hora de inicio
+        .single();
+
+      if (error) throw error;
+
+      // Actualizamos el estado para que el cronómetro empiece a correr
+      setActiveTimerInfo({ id: data.id, start_time: data.start_time });
+
+      toast({ title: "Fichaje Iniciado", variant: "success" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `No se pudo iniciar el fichaje: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStopTimer = async () => {
+    if (!activeTimerInfo) return;
+
+    setIsLoading(true);
+    try {
+      const startTime = new Date(activeTimerInfo.start_time);
+      const endTime = new Date();
+      const workedHours = (endTime - startTime) / (1000 * 60 * 60);
+
+      // Actualizamos el fichaje con la hora de fin y el tiempo total trabajado
+      const { error: updateError } = await supabase
+        .from("time_tracking")
+        .update({
+          end_time: endTime.toISOString(),
+          work_time: workedHours,
+        })
+        .eq("id", activeTimerInfo.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Fichaje Detenido",
+        description: `Tiempo trabajado: ${workedHours.toFixed(2)} hs.`,
+        variant: "success",
+      });
+
+      // Ahora, si había un proyecto, actualizamos sus horas
+      if (activeProjectId) {
+        // Obtenemos las horas actuales del proyecto
+        const { data: projectData, error: projectFetchError } = await supabase
+          .from("proyectos")
+          .select("horas, nombre")
+          .eq("uuid_id", activeProjectId)
+          .single();
+
+        if (projectFetchError) throw projectFetchError;
+
+        const currentHours = projectData.horas || 0;
+        const newHours = currentHours + workedHours;
+
+        // Actualizamos el proyecto
+        const { error: updateProjectError } = await supabase
+          .from("proyectos")
+          .update({ horas: newHours })
+          .eq("uuid_id", activeProjectId);
+
+        if (updateProjectError) throw updateProjectError;
+
+        toast({
+          title: "Horas Sumadas al Proyecto",
+          description: `Se añadieron ${workedHours.toFixed(2)} hs a "${
+            projectData.nombre
+          }".`,
+          variant: "success",
+        });
+      }
+
+      // Reseteamos y actualizamos la UI
+      setActiveTimerInfo(null);
+      setWeeklyHours((prev) => prev + workedHours); // Actualizamos el total semanal en la UI
+    } catch (error) {
+      toast({
+        title: "Error al detener el fichaje",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -196,61 +306,27 @@ const DashboardPage = () => {
         )}
       </motion.div>
 
-      {user && (user.rol === "TECNICO" || user.rol === "worker" || user.rol === 'DESARROLLADOR') && (
-        <motion.div
-          className="p-4 border rounded-lg bg-card shadow-md"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Label
-            htmlFor="active-project-select"
-            className="text-lg font-medium text-foreground"
+      {user &&
+        (user.rol === ROLES.WORKER ||
+          user.rol === ROLES.DEVELOPER) && (
+          <motion.div
           >
-            Proyecto Activo Actual:
-          </Label>
-          <div className="flex items-center gap-3 mt-2">
-            <Select
-              onValueChange={handleProjectChange}
-              value={selectedDashboardProject || ""}
-            >
-              <SelectTrigger
-                id="active-project-select"
-                className="flex-grow bg-background border-input"
-              >
-                <SelectValue placeholder="Selecciona tu proyecto activo..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Ninguno (Borrar selección)</SelectItem>
-                {projects
-                  .filter((p) => p.uuid_id)
-                  .map((p) => (
-                    <SelectItem key={p.uuid_id} value={p.uuid_id}>
-                      {p.nombre}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            {activeProjectId && (
-              <CheckCircle
-                className="h-6 w-6 text-green-500 shrink-0"
-                title={`Proyecto activo: ${
-                  projects.find((p) => p.uuid_id === activeProjectId)?.nombre ||
-                  ""
-                }`}
-              />
-            )}
-          </div>
-          {activeProjectId && activeProjectType && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Tipo de proyecto activo: {activeProjectType}
-            </p>
-          )}
-        </motion.div>
-      )}
+            <ActiveTimerCard
+              projects={projects}
+              activeProjectId={activeProjectId}
+              onProjectChange={handleProjectChange}
+              isTimerActive={!!activeTimerInfo}
+              onStartTimer={handleStartTimer}
+              onStopTimer={handleStopTimer}
+              elapsedTime={elapsedTime}
+              weeklyHours={weeklyHours}
+              weeklyGoal={weeklyGoal}
+            />
+          </motion.div>
+        )}
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <motion.custom
+        <motion.div
           variants={actionCardVariants}
           initial="hidden"
           animate="visible"
@@ -262,8 +338,8 @@ const DashboardPage = () => {
             icon={CalendarDays}
             onClick={() => navigate("/planning")}
           />
-        </motion.custom>
-        <motion.custom
+        </motion.div>
+        <motion.div
           variants={actionCardVariants}
           initial="hidden"
           animate="visible"
@@ -275,8 +351,8 @@ const DashboardPage = () => {
             icon={FilePenLine}
             onClick={() => navigate("/activities?action=new")}
           />
-        </motion.custom>
-        <motion.custom
+        </motion.div>
+        <motion.div
           variants={actionCardVariants}
           initial="hidden"
           animate="visible"
@@ -288,7 +364,7 @@ const DashboardPage = () => {
             icon={MessageSquare}
             onClick={() => navigate("/assistant")}
           />
-        </motion.custom>
+        </motion.div>
       </div>
 
       <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">

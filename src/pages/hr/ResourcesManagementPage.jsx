@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from "react";
+import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserCog, Car, Settings } from 'lucide-react';
-import UserManagement from '@/components/settings/UserManagement';
-import VehicleManagement from '@/components/settings/VehicleManagement';
+import { UserCog, Car, Settings } from "lucide-react";
+import UserManagement from "@/components/settings/UserManagement";
+import VehicleManagement from "@/components/settings/VehicleManagement";
 
 const ResourcesManagementPage = () => {
   const [activeTab, setActiveTab] = useState("userManagement");
@@ -16,24 +16,22 @@ const ResourcesManagementPage = () => {
       className="p-4 md:p-6 space-y-6"
     >
       <div className="flex items-center space-x-3 mb-6">
-        <Settings className="h-10 w-10 text-primary" />
-        <div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-            Configuración Global
-          </h1>
-          <p className="text-md text-muted-foreground">
-            Administra usuarios, vehículos y otras configuraciones del sistema.
-          </p>
-        </div>
+        <h1 className="text-3xl font-bold text-primary">Gestión de Recursos</h1>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:w-fit mb-6 bg-muted p-1 rounded-lg">
-          <TabsTrigger value="userManagement" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm px-4 py-2.5 text-sm font-medium">
+          <TabsTrigger
+            value="userManagement"
+            className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm px-4 py-2.5 text-sm font-medium"
+          >
             <UserCog className="h-5 w-5" />
             Gestión de Usuarios
           </TabsTrigger>
-          <TabsTrigger value="vehicleManagement" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm px-4 py-2.5 text-sm font-medium">
+          <TabsTrigger
+            value="vehicleManagement"
+            className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm px-4 py-2.5 text-sm font-medium"
+          >
             <Car className="h-5 w-5" />
             Gestión de Vehículos
           </TabsTrigger>

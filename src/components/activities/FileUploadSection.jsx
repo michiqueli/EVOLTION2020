@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,6 @@ const FileUploadSection = ({ filePreviews, handleFileChange, removeFile, isUploa
     {filePreviews.length > 0 && (
       <div className="mt-4 space-y-3">
         <h4 className="text-sm font-medium text-muted-foreground">Archivos Seleccionados:</h4>
-        <AnimatePresence>
         {filePreviews.map((preview) => (
           <motion.div 
             key={preview.id}
@@ -46,7 +45,6 @@ const FileUploadSection = ({ filePreviews, handleFileChange, removeFile, isUploa
             </div>
           </motion.div>
         ))}
-        </AnimatePresence>
       </div>
     )}
   </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, FileText, Filter } from "lucide-react";
+import { PlusCircle, FileText, Filter, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useUser, ROLES } from "@/contexts/UserContext";
 import ProjectCard from "@/components/projects/ProjectCard";
@@ -82,6 +82,7 @@ const ProjectsPage = () => {
 
   const fetchProjects = useCallback(
     async (filter) => {
+      setIsLoading(true);
       try {
         let query = supabase
           .from("proyectos")
@@ -101,6 +102,7 @@ const ProjectsPage = () => {
         const { data, error } = await query;
         if (error) throw error;
         setProjects(data || []);
+        setIsLoading(false);
       } catch (error) {
         console.error("Error fetching projects:", error);
         toast({
@@ -378,80 +380,85 @@ const ProjectsPage = () => {
         }}
         project={viewingProject}
       />
-
-      <>
-        {/* --- SECCIÓN DE PROYECTOS ACTIVOS --- */}
-        <section>
-          <h2 className="text-2xl font-semibold text-foreground mb-4">
-            Proyectos Activos
-          </h2>
-          {proyectosActivos.length > 0 ? (
-            <motion.div
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-              layout
-            >
-              {proyectosActivos.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  onUpdateStatus={handleUpdateStatus}
-                  onEdit={handleEditProject}
-                  onDelete={handleDeleteProject}
-                  onViewDetails={handleViewDetails}
-                  // No pasamos prop de inactivo aquí
-                />
-              ))}
-            </motion.div>
-          ) : (
-            <p className="text-muted-foreground italic">
-              No hay proyectos activos o el filtro seleccionado los esta
-              ocultando
-            </p>
-          )}
-        </section>
-
-        {/* --- SECCIÓN DE PROYECTOS NO ACTIVOS --- */}
-        {proyectosNoActivos.length > 0 && (
-          <section className="mt-12">
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64 text-muted-foreground text-lg">
+          <Loader2 className="h-12 w-12 text-primary animate-spin" />
+        </div>
+      ) : (
+        <>
+          {/* --- SECCIÓN DE PROYECTOS ACTIVOS --- */}
+          <section>
             <h2 className="text-2xl font-semibold text-foreground mb-4">
-              Proyectos NO Activos
+              Proyectos Activos
             </h2>
-            <motion.div
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-              layout
-            >
-              {proyectosNoActivos.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  onUpdateStatus={handleUpdateStatus}
-                  onEdit={handleEditProject}
-                  onDelete={handleDeleteProject}
-                  onViewDetails={handleViewDetails}
-                  isInactivo={true}
-                />
-              ))}
-            </motion.div>
+            {proyectosActivos.length > 0 ? (
+              <motion.div
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                layout
+              >
+                {proyectosActivos.map((project) => (
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    onUpdateStatus={handleUpdateStatus}
+                    onEdit={handleEditProject}
+                    onDelete={handleDeleteProject}
+                    onViewDetails={handleViewDetails}
+                    // No pasamos prop de inactivo aquí
+                  />
+                ))}
+              </motion.div>
+            ) : (
+              <p className="text-muted-foreground italic">
+                No hay proyectos activos o el filtro seleccionado los esta
+                ocultando
+              </p>
+            )}
           </section>
-        )}
 
-        {/* Mensaje de "No hay proyectos" si ambas listas están vacías */}
-        {projects.length === 0 && (
-          <div className="rounded-lg border border-dashed border-border p-12 text-center mt-8">
-            <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-xl font-semibold text-foreground">
-              No hay proyectos aún
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {canManageProjects
-                ? "Crea tu primer proyecto para empezar a organizarte."
-                : isTechnician
-                ? "No tienes proyectos asignados."
-                : "No hay proyectos creados."}
-            </p>
-          </div>
-        )}
-      </>
+          {/* --- SECCIÓN DE PROYECTOS NO ACTIVOS --- */}
+          {proyectosNoActivos.length > 0 && (
+            <section className="mt-12">
+              <h2 className="text-2xl font-semibold text-foreground mb-4">
+                Proyectos NO Activos
+              </h2>
+              <motion.div
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                layout
+              >
+                {proyectosNoActivos.map((project) => (
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    onUpdateStatus={handleUpdateStatus}
+                    onEdit={handleEditProject}
+                    onDelete={handleDeleteProject}
+                    onViewDetails={handleViewDetails}
+                    isInactivo={true}
+                  />
+                ))}
+              </motion.div>
+            </section>
+          )}
+
+          {/* Mensaje de "No hay proyectos" si ambas listas están vacías */}
+          {projects.length === 0 && (
+            <div className="rounded-lg border border-dashed border-border p-12 text-center mt-8">
+              <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-4 text-xl font-semibold text-foreground">
+                No hay proyectos aún
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {canManageProjects
+                  ? "Crea tu primer proyecto para empezar a organizarte."
+                  : isTechnician
+                  ? "No tienes proyectos asignados."
+                  : "No hay proyectos creados."}
+              </p>
+            </div>
+          )}
+        </>
+      )}
     </motion.div>
   );
 };

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   PlusCircle,
@@ -8,6 +8,7 @@ import {
   Home,
   ShieldAlert,
   Hammer,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import ActivityBranchSelector from "@/components/activities/ActivityBranchSelector";
@@ -53,11 +54,7 @@ const ActivitiesPage = () => {
   const [filePreviews, setFilePreviews] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState({});
-
-  useEffect(() => {
-    fetchActivities();
-    fetchProjects();
-  }, [filterBranch]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchProjects = async () => {
     try {
@@ -78,25 +75,35 @@ const ActivitiesPage = () => {
     }
   };
 
-  const fetchActivities = async () => {
+  const fetchActivities = useCallback(async () => {
+    // --- CAMBIO 2: Ahora esta función controla el estado de carga ---
+    setIsLoading(true);
     try {
       let allActivities = [];
-      for (const branch of activityBranchesData) {
-        if (filterBranch === "all" || filterBranch === branch.id) {
-          const { data, error } = await supabase
-            .from(branch.tableName)
-            .select("*")
-            .order("created_at", { ascending: false });
+      const branchesToFetch =
+        filterBranch === "all"
+          ? activityBranchesData
+          : activityBranchesData.filter((b) => b.id === filterBranch);
 
-          if (error) throw error;
-
-          const formattedData = (data || []).map((item) => ({
-            ...item,
-            branch: branch.id,
-          }));
-
-          allActivities = [...allActivities, ...formattedData];
+      for (const branch of branchesToFetch) {
+        const { data, error } = await supabase
+          .from(branch.tableName)
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (error) {
+          // Si una tabla no existe, en lugar de romper todo, solo lo notificamos en consola
+          console.warn(
+            `Could not fetch from table ${branch.tableName}:`,
+            error.message
+          );
+          continue; // y seguimos con la siguiente
         }
+        const formattedData = (data || []).map((item) => ({
+          ...item,
+          branch: branch.id,
+          branchName: branch.name,
+        }));
+        allActivities = [...allActivities, ...formattedData];
       }
       setActivities(allActivities);
     } catch (error) {
@@ -106,8 +113,19 @@ const ActivitiesPage = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      // Solo cuando todo termina, la carga finaliza.
+      setIsLoading(false);
     }
-  };
+  }, [toast, filterBranch]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -293,16 +311,22 @@ const ActivitiesPage = () => {
         </Button>
       </div>
 
-      <AnimatePresence mode="wait">
-        {showBranchSelector && (
+      {/* La lógica de renderizado ahora se muestra aquí */}
+
+      {isLoading ? (
+        // 1. Si está cargando, muestra el spinner.
+        <div className="flex justify-center items-center h-64 text-muted-foreground text-lg">
+          <Loader2 className="h-12 w-12 text-primary animate-spin" />
+        </div>
+      ) : showForm || showBranchSelector ? (
+        // 2. Si no está cargando PERO se está mostrando un formulario, muestra el formulario correspondiente.
+        showBranchSelector ? (
           <ActivityBranchSelector
             branches={activityBranchesData}
             onSelect={handleBranchSelect}
             onCancel={() => setShowBranchSelector(false)}
           />
-        )}
-
-        {showForm && (
+        ) : (
           <ActivityForm
             selectedBranch={selectedBranch}
             activityBranches={activityBranchesData}
@@ -324,40 +348,37 @@ const ActivitiesPage = () => {
               setFilePreviews([]);
             }}
           />
-        )}
-
-        {!showForm && !showBranchSelector && activities.length > 0 ? (
-          <ActivityTable
-            activities={activities}
-            selectedBranch={filterBranch}
-            onBranchChange={handleBranchFilter}
-            onViewActivity={handleViewActivity}
-            onEditActivity={handleEditActivity}
-            onDeleteActivity={handleDeleteActivity}
-            activityBranches={activityBranchesData}
-          />
-        ) : (
-          !showForm &&
-          !showBranchSelector && (
-            <div className="rounded-lg border border-dashed border-border p-12 text-center mt-8">
-              <ClipboardList className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-xl font-semibold text-foreground">
-                No hay informes activos
-              </h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Crea un nuevo informe para registrar tu actividad diaria.
-              </p>
-              <Button
-                onClick={handleCreateNewReport}
-                className="mt-6 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg flex items-center gap-2 mx-auto"
-              >
-                <PlusCircle className="mr-2 h-5 w-5" />
-                Crear Nuevo Informe
-              </Button>
-            </div>
-          )
-        )}
-      </AnimatePresence>
+        )
+      ) : activities.length > 0 ? (
+        // 3. Si no está cargando, no hay formularios activos Y HAY actividades, muestra la tabla.
+        <ActivityTable
+          activities={activities}
+          selectedBranch={filterBranch}
+          onBranchChange={handleBranchFilter}
+          onViewActivity={handleViewActivity}
+          onEditActivity={handleEditActivity}
+          onDeleteActivity={handleDeleteActivity}
+          activityBranches={activityBranchesData}
+        />
+      ) : (
+        // 4. Si no está cargando, no hay formularios activos Y NO HAY actividades, muestra el mensaje.
+        <div className="rounded-lg border border-dashed border-border p-12 text-center mt-8">
+          <ClipboardList className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-4 text-xl font-semibold text-foreground">
+            No hay informes
+          </h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Crea un nuevo informe para registrar tu actividad diaria.
+          </p>
+          <Button
+            onClick={handleCreateNewReport}
+            className="mt-6 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg flex items-center gap-2 mx-auto"
+          >
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Crear Nuevo Informe
+          </Button>
+        </div>
+      )}
 
       <ActivityDetailModal
         isOpen={showDetailModal}

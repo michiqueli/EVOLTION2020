@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { UserPlus, Edit, Loader2, Trash2 } from "lucide-react";
+import { UserPlus, Edit, Loader2, Trash2, UserCog } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -309,7 +309,10 @@ const UserManagementPage = () => {
       className="space-y-6 p-1"
     >
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold text-primary">Gestión de Usuarios</h1>
+        <h1 className="text-2xl font-semibold text-foreground flex items-center">
+          <UserCog className="mr-3 h-7 w-7 text-primary" />
+          Gestión de Usuarios
+        </h1>
         <Button
           onClick={openModalForCreate}
           className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg flex items-center gap-2"
