@@ -19,10 +19,16 @@ import FileUploadSection from "@/components/activities/FileUploadSection";
 const PROJECT_TYPES = [
   { value: "placas_industrial", label: "Placas Industrial" },
   { value: "placas_domesticas", label: "Placas Domésticas" },
-  { value: "hicado", label: "Hincado" },
+  { value: "hincado", label: "Hincado" },
   { value: "seguridad_altura", label: "Seguridad en Altura" },
   { value: "otro", label: "Otro" },
 ];
+
+const PROJECT_TYPE_FIELDS = {
+  placas_industrial: ["placas_a_instalar", "estructura_a_instalar", "metros_cable", "metros_canalizacion"],
+  hincado: ["hincas", "predrilling", "hincas_repartir"],
+  seguridad_altura: ["valla_perimetral", "escaleras_instaladas", "lineas_vida"],
+};
 
 // --- Sub-componentes para cada formulario para mantener el código limpio ---
 const IndustrialForm = ({ data, onChange, disabled }) => (
@@ -187,14 +193,24 @@ const ProjectFormModal = ({
     });
   };
   const handleProjectTypeToggle = (typeValue) => {
-    const currentTypes = projectData.project_type
-      ? projectData.project_type
-      : [];
+    const currentTypes = Array.isArray(projectData.project_type) ? projectData.project_type : [];
     const newTypes = currentTypes.includes(typeValue)
       ? currentTypes.filter((t) => t !== typeValue)
       : [...currentTypes, typeValue];
+
     onInputChange({ target: { name: "project_type", value: newTypes } });
+    
+    if (currentTypes.includes(typeValue)) {
+      const fieldsToRemove = PROJECT_TYPE_FIELDS[typeValue] || [];
+      const currentDetails = { ...projectData.detalles_tipo_proyecto };
+      
+      fieldsToRemove.forEach(field => {
+        delete currentDetails[field];
+      });
+      onInputChange({ target: { name: "detalles_tipo_proyecto", value: currentDetails } });
+    }
   };
+  
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[625px] bg-background border-border max-h-[90vh] overflow-y-auto">
@@ -249,7 +265,6 @@ const ProjectFormModal = ({
                 const isSelected =  Array.isArray(projectData.project_type) && projectData.project_type?.includes(
                   type.value
                 );
-                console.log(projectData.project_type)
                 return (
                   <Button
                     key={type.value}
@@ -274,7 +289,7 @@ const ProjectFormModal = ({
                 disabled={!canManage}
               />
             )}
-            {projectData.project_type?.includes("hicado") && (
+            {projectData.project_type?.includes("hincado") && (
               <HincadoForm
                 data={projectData.detalles_tipo_proyecto}
                 onChange={handleDetailsInputChange}

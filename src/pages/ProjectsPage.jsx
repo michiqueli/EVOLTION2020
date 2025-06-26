@@ -148,7 +148,6 @@ const ProjectsPage = () => {
         project_type: currentProjectData.project_type,
         detalles_tipo_proyecto: currentProjectData.detalles_tipo_proyecto || {},
       };
-      console.log(dataToSave)
       // 2. Lógica para diferenciar entre EDITAR y CREAR
       if (editingProject) {
         // --- LÓGICA DE ACTUALIZACIÓN ---
