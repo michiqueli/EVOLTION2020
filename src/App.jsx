@@ -20,7 +20,6 @@ import ReportsPage from "@/pages/ReportsPage";
 import ProfilePage from "@/pages/ProfilePage";
 import LoginPage from "./pages/LoginPage";
 import ProjectTrackingPage from "@/pages/ProjectTrackingPage";
-import ProjectSelectionForTrackingPage from "@/pages/ProjectSelectionForTrackingPage";
 import ResourcesManagementPage from "@/pages/hr/ResourcesManagementPage";
 import TimeTrackingPage from "@/pages/hr/TimeTrackingPage";
 import AbsenceManagementPage from "@/pages/hr/AbsenceManagementPage";
@@ -85,14 +84,7 @@ const AppContent = () => {
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/planning" element={<PlanningPage />} />
           <Route path="/activities" element={<ActivitiesPage />} />
-          <Route
-            path="/tracking"
-            element={<ProjectSelectionForTrackingPage />}
-          />
-          <Route
-            path="/tracking/:projectId"
-            element={<ProjectTrackingPage />}
-          />
+
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/assistant" element={<AssistantPage />} />
         </Route>
@@ -114,7 +106,18 @@ const AppContent = () => {
         >
           <Route path="/hr/resources" element={<ResourcesManagementPage />} />
         </Route>
-
+        <Route
+          element={
+            <ProtectedRoute
+              allowedRoles={[ROLES.ADMIN, ROLES.CEO, ROLES.DEVELOPER]}
+            />
+          }
+        >
+          <Route
+            path="/tracking/:projectId"
+            element={<ProjectTrackingPage />}
+          />
+        </Route>
         <Route
           element={
             <ProtectedRoute

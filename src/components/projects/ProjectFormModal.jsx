@@ -9,20 +9,161 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabaseClient";
+import { cn } from "@/lib/utils";
 import FileUploadSection from "@/components/activities/FileUploadSection";
 
 const PROJECT_TYPES = [
-  { value: "placas_domesticas", label: "Placas Solares Domésticas" },
-  { value: "placas_industrial", label: "Placas Soalres Industrial" },
-  { value: "hincado", label: "Hincado" },
+  { value: "placas_industrial", label: "Placas Industrial" },
+  { value: "placas_domesticas", label: "Placas Domésticas" },
+  { value: "hicado", label: "Hincado" },
   { value: "seguridad_altura", label: "Seguridad en Altura" },
   { value: "otro", label: "Otro" },
 ];
+
+// --- Sub-componentes para cada formulario para mantener el código limpio ---
+const IndustrialForm = ({ data, onChange, disabled }) => (
+  <div className="p-4 border rounded-md bg-card mt-4 space-y-4">
+    <h4 className="font-medium text-center text-muted-foreground">
+      Cantidades para Placas Industrial
+    </h4>
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-1.5">
+        <Label>Placas por Instalar</Label>
+        <Input
+          type="number"
+          name="placas_a_instalar"
+          value={data?.placas_a_instalar || ""}
+          onChange={onChange}
+          disabled={disabled}
+          className="bg-background"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Estructura por Instalar</Label>
+        <Input
+          type="number"
+          name="estructura_a_instalar"
+          value={data?.estructura_a_instalar || ""}
+          onChange={onChange}
+          disabled={disabled}
+          className="bg-background"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Metros de Cable</Label>
+        <Input
+          type="number"
+          name="metros_cable"
+          value={data?.metros_cable || ""}
+          onChange={onChange}
+          disabled={disabled}
+          className="bg-background"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Metros de Canalización</Label>
+        <Input
+          type="number"
+          name="metros_canalizacion"
+          value={data?.metros_canalizacion || ""}
+          onChange={onChange}
+          disabled={disabled}
+          className="bg-background"
+        />
+      </div>
+    </div>
+  </div>
+);
+
+const HincadoForm = ({ data, onChange, disabled }) => (
+  <div className="p-4 border rounded-md bg-card mt-4 space-y-4">
+    <h4 className="font-medium text-center text-muted-foreground">
+      Cantidades para Hincado
+    </h4>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="space-y-1.5">
+        <Label>Hincas</Label>
+        <Input
+          type="number"
+          name="hincas"
+          value={data?.hincas || ""}
+          onChange={onChange}
+          disabled={disabled}
+          className="bg-background"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Predrilling</Label>
+        <Input
+          type="number"
+          name="predrilling"
+          value={data?.predrilling || ""}
+          onChange={onChange}
+          disabled={disabled}
+          className="bg-background"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Hincas por repartir</Label>
+        <Input
+          type="number"
+          name="hincas_repartir"
+          value={data?.hincas_repartir || ""}
+          onChange={onChange}
+          disabled={disabled}
+          className="bg-background"
+        />
+      </div>
+    </div>
+  </div>
+);
+
+const SeguridadForm = ({ data, onChange, disabled }) => (
+  <div className="p-4 border rounded-md bg-card mt-4 space-y-4">
+    <h4 className="font-medium text-center text-muted-foreground">
+      Cantidades para Seguridad en Altura
+    </h4>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="space-y-1.5">
+        <Label>Valla Perimetral (m)</Label>
+        <Input
+          type="number"
+          name="valla_perimetral"
+          value={data?.valla_perimetral || ""}
+          onChange={onChange}
+          disabled={disabled}
+          className="bg-background"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Escaleras Instaladas</Label>
+        <Input
+          type="number"
+          name="escaleras_instaladas"
+          value={data?.escaleras_instaladas || ""}
+          onChange={onChange}
+          disabled={disabled}
+          className="bg-background"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Líneas de Vida (m)</Label>
+        <Input
+          type="number"
+          name="lineas_vida"
+          value={data?.lineas_vida || ""}
+          onChange={onChange}
+          disabled={disabled}
+          className="bg-background"
+        />
+      </div>
+    </div>
+  </div>
+);
 
 const ProjectFormModal = ({
   isOpen,
@@ -32,31 +173,28 @@ const ProjectFormModal = ({
   onSubmit,
   isEditing,
   canManage,
-  projectType,
-  onProjectTypeChange,
   isLoading,
 }) => {
   const handleDetailsInputChange = (e) => {
     const { name, value } = e.target;
+    const currentDetails = projectData.detalles_tipo_proyecto || {};
     const newDetails = {
-      ...projectData.detalles_tipo_proyecto,
+      ...currentDetails,
       [name]: value ? parseFloat(value) : 0,
     };
     onInputChange({
-      target: {
-        name: "detalles_tipo_proyecto",
-        value: newDetails,
-      },
+      target: { name: "detalles_tipo_proyecto", value: newDetails },
     });
   };
-
-  const handleFormSubmit = (e) => {
-    e.preventDefault();
-    if (canManage) {
-      onSubmit(e, projectType);
-    }
+  const handleProjectTypeToggle = (typeValue) => {
+    const currentTypes = projectData.project_type
+      ? projectData.project_type
+      : [];
+    const newTypes = currentTypes.includes(typeValue)
+      ? currentTypes.filter((t) => t !== typeValue)
+      : [...currentTypes, typeValue];
+    onInputChange({ target: { name: "project_type", value: newTypes } });
   };
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[625px] bg-background border-border max-h-[90vh] overflow-y-auto">
@@ -70,247 +208,87 @@ const ProjectFormModal = ({
               : "Completa los detalles para registrar un nuevo proyecto."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleFormSubmit} className="grid gap-6 py-4">
+        <form onSubmit={onSubmit} className="grid gap-6 py-4">
           <div className="space-y-2">
-            <Label htmlFor="nombre" className="text-foreground">
-              Nombre del Proyecto
-            </Label>
+            <Label htmlFor="nombre">Nombre del Proyecto</Label>
             <Input
               id="nombre"
               name="nombre"
-              value={projectData.nombre}
+              value={projectData.nombre || ""}
               onChange={onInputChange}
-              placeholder="Ej: Instalación Edificio Central"
-              className="bg-card border-input"
               required
               disabled={!canManage}
             />
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="direccion" className="text-foreground">
-              Dirección
-            </Label>
+            <Label htmlFor="direccion">Dirección</Label>
             <Input
               id="direccion"
               name="direccion"
-              value={projectData.direccion}
+              value={projectData.direccion || ""}
               onChange={onInputChange}
-              placeholder="Ej: Calle Falsa 123, Ciudad"
-              className="bg-card border-input"
               required
               disabled={!canManage}
             />
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="descripcion" className="text-foreground">
-              Descripción del Proyecto
-            </Label>
+            <Label htmlFor="descripcion">Descripción</Label>
             <Textarea
               id="descripcion"
               name="descripcion"
-              value={projectData.descripcion}
+              value={projectData.descripcion || ""}
               onChange={onInputChange}
-              placeholder="Detalles adicionales sobre el proyecto..."
-              className="bg-card border-input min-h-[100px]"
               disabled={!canManage}
             />
           </div>
-          {/* --- AQUÍ EMPIEZA LA NUEVA SECCIÓN DE SOLAPAS --- */}
+
           <div className="space-y-2">
-            <Label>Tipo de Proyecto</Label>
-            <Tabs
-              value={projectType}
-              onValueChange={onProjectTypeChange}
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-5 h-auto">
-                {PROJECT_TYPES.map((type) => (
-                  <TabsTrigger
+            <Label>Tipos de Proyecto (selecciona uno o más)</Label>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {PROJECT_TYPES.map((type) => {
+                const isSelected =  Array.isArray(projectData.project_type) && projectData.project_type?.includes(
+                  type.value
+                );
+                console.log(projectData.project_type)
+                return (
+                  <Button
                     key={type.value}
-                    value={type.value}
-                    className="text-xs sm:text-sm h-auto py-2 whitespace-normal"
+                    type="button"
+                    variant={isSelected ? "default" : "outline"}
+                    onClick={() => handleProjectTypeToggle(type.value)}
+                    className="transition-all duration-200"
+                    disabled={!canManage}
                   >
                     {type.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-
-              {/* Contenido para cada solapa (por ahora con placeholders) */}
-              <TabsContent value="placas_industrial">
-                <div className="p-4 border rounded-md bg-card mt-2 space-y-4">
-                  <h4 className="font-medium text-center text-muted-foreground">
-                    Cantidades Totales del Proyecto
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label>Placas por Instalar</Label>
-                      <Input
-                        type="number"
-                        name="placas_a_instalar"
-                        value={
-                          projectData.detalles_tipo_proyecto
-                            ?.placas_a_instalar || ""
-                        }
-                        onChange={handleDetailsInputChange}
-                        className="bg-background"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Estructura por Instalar</Label>
-                      <Input
-                        type="number"
-                        name="estructura_a_instalar"
-                        value={
-                          projectData.detalles_tipo_proyecto
-                            ?.estructura_a_instalar || ""
-                        }
-                        onChange={handleDetailsInputChange}
-                        className="bg-background"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Metros de Cable</Label>
-                      <Input
-                        type="number"
-                        name="metros_cable"
-                        value={
-                          projectData.detalles_tipo_proyecto?.metros_cable || ""
-                        }
-                        onChange={handleDetailsInputChange}
-                        className="bg-background"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Metros de Canalización</Label>
-                      <Input
-                        type="number"
-                        name="metros_canalizacion"
-                        value={
-                          projectData.detalles_tipo_proyecto
-                            ?.metros_canalizacion || ""
-                        }
-                        onChange={handleDetailsInputChange}
-                        className="bg-background"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="otro">
-                <div className="p-4 border rounded-md bg-card mt-2">
-                  <p className="text-center text-muted-foreground italic">
-                    Este tipo de proyecto no requiere detalles de cantidad
-                    adicionales.
-                  </p>
-                </div>
-              </TabsContent>
-              <TabsContent value="placas_domesticas">
-                <div className="p-4 border rounded-md bg-card mt-2">
-                  <p className="text-center text-muted-foreground italic">
-                    Este tipo de proyecto no requiere detalles de cantidad
-                    adicionales.
-                  </p>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="hincado">
-                <div className="p-4 border rounded-md bg-card mt-2 space-y-4">
-                  <h4 className="font-medium text-center text-muted-foreground">
-                    Cantidades Totales del Proyecto
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <Label>Hincas</Label>
-                      <Input
-                        type="number"
-                        name="hincas"
-                        value={projectData.detalles_tipo_proyecto?.hincas || ""}
-                        onChange={handleDetailsInputChange}
-                        className="bg-background"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Predrilling</Label>
-                      <Input
-                        type="number"
-                        name="predrilling"
-                        value={
-                          projectData.detalles_tipo_proyecto?.predrilling || ""
-                        }
-                        onChange={handleDetailsInputChange}
-                        className="bg-background"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Hincas por repartir</Label>
-                      <Input
-                        type="number"
-                        name="hincas_repartir"
-                        value={
-                          projectData.detalles_tipo_proyecto?.hincas_repartir ||
-                          ""
-                        }
-                        onChange={handleDetailsInputChange}
-                        className="bg-background"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="seguridad_altura">
-                <div className="p-4 border rounded-md bg-card mt-2 space-y-4">
-                  <h4 className="font-medium text-center text-muted-foreground">
-                    Cantidades Totales del Proyecto
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <Label>Valla Perimetral (m)</Label>
-                      <Input
-                        type="number"
-                        name="valla_perimetral"
-                        value={
-                          projectData.detalles_tipo_proyecto
-                            ?.valla_perimetral || ""
-                        }
-                        onChange={handleDetailsInputChange}
-                        className="bg-background"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Escaleras Instaladas</Label>
-                      <Input
-                        type="number"
-                        name="escaleras_instaladas"
-                        value={
-                          projectData.detalles_tipo_proyecto
-                            ?.escaleras_instaladas || ""
-                        }
-                        onChange={handleDetailsInputChange}
-                        className="bg-background"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Líneas de Vida (m)</Label>
-                      <Input
-                        type="number"
-                        name="lineas_vida"
-                        value={
-                          projectData.detalles_tipo_proyecto?.lineas_vida || ""
-                        }
-                        onChange={handleDetailsInputChange}
-                        className="bg-background"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
+                  </Button>
+                );
+              })}
+            </div>
           </div>
-          {/* --- FIN DE LA SECCIÓN DE SOLAPAS --- */}
+
+          <div className="space-y-4">
+            {projectData.project_type?.includes("placas_industrial") && (
+              <IndustrialForm
+                data={projectData.detalles_tipo_proyecto}
+                onChange={handleDetailsInputChange}
+                disabled={!canManage}
+              />
+            )}
+            {projectData.project_type?.includes("hicado") && (
+              <HincadoForm
+                data={projectData.detalles_tipo_proyecto}
+                onChange={handleDetailsInputChange}
+                disabled={!canManage}
+              />
+            )}
+            {projectData.project_type?.includes("seguridad_altura") && (
+              <SeguridadForm
+                data={projectData.detalles_tipo_proyecto}
+                onChange={handleDetailsInputChange}
+                disabled={!canManage}
+              />
+            )}
+          </div>
 
           <FileUploadSection
             filePreviews={
@@ -391,9 +369,10 @@ const ProjectFormModal = ({
                 },
               });
             }}
-            isUploading={false} // opcional: podrías agregar un estado para mostrar animación
+            isUploading={false}
             disabled={!canManage}
           />
+
           <DialogFooter className="pt-4">
             <Button
               type="button"
@@ -410,7 +389,7 @@ const ProjectFormModal = ({
                 disabled={isLoading}
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditing ? "Guardar Cambios" : "Guardar Proyecto"}
+                {isEditing ? "Guardar Cambios" : "Crear Proyecto"}
               </Button>
             )}
           </DialogFooter>

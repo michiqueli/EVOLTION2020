@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -107,7 +108,7 @@ const ProjectCard = ({
       user.rol === ROLES.ADMIN ||
       user.rol === ROLES.SUPERVISOR ||
       user.rol === ROLES.DEVELOPER);
-  const isTechnician = user && user.rol === ROLES.WORKER;
+  const navigate = useNavigate();
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -145,75 +146,68 @@ const ProjectCard = ({
                 <h3 className="text-xl font-semibold text-primary pr-8">
                   {project.nombre}
                 </h3>
-
                 {canManage && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 absolute top-2 right-2"
-                      >
-                        <MoreVertical className="h-5 w-5 text-muted-foreground" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="bg-background border-border shadow-xl"
+                  <div className="top-2 right-2 flex items-center">
+                    <Button
+                      variant="default"
+                      className="h-9 px-2 md:px-3"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/tracking/${project.uuid_id}`);
+                      }}
                     >
-                      <DropdownMenuLabel>Cambiar Estado</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {projectStatusOptions.map((statusOpt) => (
+                      <Eye
+                        className="h-5 w-5 md:mr-2"
+                      />
+                      <span className="hidden xl:inline">Seguimiento</span>
+                    </Button>
+                    {/* Menú de tres puntos para otras acciones */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        {/* Le quitamos el posicionamiento absoluto porque ahora está dentro del div con flex */}
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <MoreVertical className="h-5 w-5 text-muted-foreground" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="bg-background border-border shadow-xl"
+                        // Detenemos la propagación aquí para que al hacer clic en el contenido no se cierre todo
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <DropdownMenuLabel>Cambiar Estado</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {projectStatusOptions.map((statusOpt) => (
+                          <DropdownMenuItem
+                            key={statusOpt.value}
+                            onClick={() =>
+                              onUpdateStatus(project.id, statusOpt.value)
+                            }
+                            disabled={project.estado === statusOpt.value}
+                            className="flex items-center gap-2"
+                          >
+                            {React.cloneElement(statusOpt.icon, {
+                              className: cn("h-4 w-4", statusOpt.iconColor),
+                            })}
+                            <span>{statusOpt.label}</span>
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          key={statusOpt.value}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onUpdateStatus(project.id, statusOpt.value);
-                          }}
-                          disabled={project.estado === statusOpt.value}
+                          onClick={() => onEdit(project)}
                           className="flex items-center gap-2"
                         >
-                          {React.cloneElement(statusOpt.icon, {
-                            className: cn("h-4 w-4", statusOpt.iconColor),
-                          })}
-                          <span>{statusOpt.label}</span>
+                          <Edit2 className="h-4 w-4" /> Editar Proyecto
                         </DropdownMenuItem>
-                      ))}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEdit(project);
-                        }}
-                        className="flex items-center gap-2"
-                      >
-                        <Edit2 className="h-4 w-4" /> Editar Proyecto
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(project.id);
-                        }}
-                        className="text-destructive focus:text-destructive focus:bg-destructive/10 flex items-center gap-2"
-                      >
-                        <Trash2 className="h-4 w-4" /> Eliminar Proyecto
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-
-                {isTechnician && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 absolute top-2 right-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onViewDetails(project);
-                    }}
-                  >
-                    <Eye className="h-5 w-5 text-muted-foreground" />
-                  </Button>
+                        <DropdownMenuItem
+                          onClick={() => onDelete(project.id)}
+                          className="text-destructive focus:text-destructive focus:bg-destructive/10 flex items-center gap-2"
+                        >
+                          <Trash2 className="h-4 w-4" /> Eliminar Proyecto
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 )}
               </div>
               <p className="text-sm text-muted-foreground">

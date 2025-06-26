@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export const ActionCard = ({ title, description, icon: Icon, onClick, className, badge, badgeColor }) => {
+export const ActionCard = ({ title, description, icon: Icon, onClick, className, badge, badgeColor, buttonTittle }) => {
   return (
     <motion.div
       className={cn(
@@ -28,13 +28,13 @@ export const ActionCard = ({ title, description, icon: Icon, onClick, className,
           )}
         </div>
         <h3 className="text-xl font-semibold text-foreground mb-1.5">{title}</h3>
-        <p className="text-sm text-muted-foreground mb-4 flex-grow">{description}</p>
+        <div className="text-sm text-muted-foreground mb-4 flex-grow">{description}</div>
         <Button 
           variant="ghost" 
           onClick={onClick} 
           className="mt-auto self-start text-primary hover:text-primary hover:bg-primary/10 px-0 py-1 h-auto group-hover:translate-x-1 transition-transform"
         >
-          <span className="font-medium">Comenzar ahora</span>
+          <span className="font-medium">{buttonTittle}</span>
           <ChevronRight className="ml-1 h-5 w-5" />
         </Button>
       </div>

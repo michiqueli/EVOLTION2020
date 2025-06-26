@@ -35,7 +35,7 @@ import {
 import { exportTimeEntriesToExcel } from "@/lib/exportTimersToExcel";
 
 const TimeTrackingPage = () => {
-  const { user, activeProjectId, setCurrentActiveProject } = useUser();
+  const { user, activeProjectId, setCurrentActiveProject, isOtherProject } = useUser();
   const [timeEntries, setTimeEntries] = useState([]);
   const [projects, setProjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,7 +44,6 @@ const TimeTrackingPage = () => {
   const [activeTimer, setActiveTimer] = useState(null);
   const [filteredTimeEntries, setFilteredTimeEntries] = useState([]);
   const [quickStartNotes, setQuickStartNotes] = useState("");
-  const [isOtherProject, setIsOtherProject] = useState(false);
   const [otherProjectDetails, setOtherProjectDetails] = useState("");
   const [elapsedTime, setElapsedTime] = useState("00:00:00");
 
@@ -92,7 +91,7 @@ const TimeTrackingPage = () => {
           project_name:
             entry.proyectos?.nombre ||
             (entry.is_other_project
-              ? `OTROS: ${entry.other_project_details}`
+              ? `OTRO: ${entry.other_project_details}`
               : "N/A"),
         }))
       );
@@ -108,8 +107,9 @@ const TimeTrackingPage = () => {
   const fetchProjects = useCallback(async () => {
     const { data, error } = await supabase
       .from("proyectos")
-      .select("id, uuid_id, nombre")
-      .order("nombre");
+      .select("id, nombre")
+      .order("nombre")
+      .eq('estado', 'En Proceso')
     if (error) {
       toast({
         title: "Error",
@@ -148,22 +148,21 @@ const TimeTrackingPage = () => {
   }, [activeTimer, timeEntries]);
 
   const handleActiveProjectChange = (projectId) => {
-    if (projectId === "OTROS") {
-      setIsOtherProject(true);
-      setCurrentActiveProject(null);
-    } else {
-      setIsOtherProject(false);
-      setOtherProjectDetails("");
       setCurrentActiveProject(projectId);
-      const project = projects.find((p) => p.uuid_id === projectId);
+      const project = projects.find((p) => p.id === projectId);
       if (project) {
         toast({
           title: "Proyecto Activo Cambiado",
           description: `Ahora estás trabajando en "${project.nombre}".`,
           variant: "success",
         });
+      } else {
+        toast({
+          title: "Proyecto Activo Cambiado",
+          description: `Seleccionaste "OTRO" como proyecto, por favor no olvides describir de que se trata.`,
+          variant: "info",
+        });
       }
-    }
   };
   const toLocalISOString = (dateString) => {
     if (!dateString) return "";
@@ -190,7 +189,7 @@ const TimeTrackingPage = () => {
     if (isOtherProject && !otherProjectDetails.trim()) {
       toast({
         title: "Acción Requerida",
-        description: "Añade los detalles del proyecto 'OTROS'.",
+        description: "Añade los detalles del proyecto 'OTRO'.",
         variant: "destructive",
       });
       return;
@@ -342,7 +341,7 @@ const TimeTrackingPage = () => {
 
   const handleModalSelectChange = (name, value) => {
     setModalFormData((prev) => ({ ...prev, [name]: value }));
-    if (name === "project_id" && value === "OTROS") {
+    if (name === "project_id" && value === "OTRO") {
       setModalFormData((prev) => ({
         ...prev,
         is_other_project: true,
@@ -377,7 +376,7 @@ const TimeTrackingPage = () => {
   const openModalForEdit = (entry) => {
     setCurrentEntry(entry);
     setModalFormData({
-      project_id: entry.project_id || (entry.is_other_project ? "OTROS" : ""),
+      project_id: entry.project_id || (entry.is_other_project ? "OTRO" : ""),
       date: entry.date,
       start_time: entry.start_time ? toLocalISOString(entry.start_time) : "",
       end_time: entry.end_time ? toLocalISOString(entry.end_time) : "",
@@ -726,7 +725,7 @@ const TimeTrackingPage = () => {
             {/* CORREGIDO: El valor y la clave ahora usan uuid_id */}
             <Select
               name="project_id"
-              value={isOtherProject ? "OTROS" : activeProjectId || ""}
+              value={isOtherProject ? "OTRO" : activeProjectId || 0}
               onValueChange={handleActiveProjectChange}
             >
               <SelectTrigger
@@ -737,18 +736,18 @@ const TimeTrackingPage = () => {
               </SelectTrigger>
               <SelectContent>
                 {projects.map((p) => (
-                  <SelectItem key={p.uuid_id} value={p.uuid_id}>
+                  <SelectItem key={p.id} value={p.id}>
                     {p.nombre}
                   </SelectItem>
                 ))}
-                <SelectItem value="OTROS">OTROS (No listado)</SelectItem>
+                <SelectItem value="OTRO">OTRO (No listado)</SelectItem>
               </SelectContent>
             </Select>
           </div>
           {isOtherProject && (
             <div>
               <Label htmlFor="quick-start-other-details">
-                Detalles del Proyecto "OTROS"
+                Detalles del Proyecto "OTRO"
               </Label>
               <Input
                 id="quick-start-other-details"
@@ -796,8 +795,8 @@ const TimeTrackingPage = () => {
                 name="project_id"
                 value={
                   modalFormData.is_other_project
-                    ? "OTROS"
-                    : modalFormData.project_id || ""
+                    ? "OTRO"
+                    : modalFormData.project_id || 0
                 }
                 onValueChange={(value) =>
                   handleModalSelectChange("project_id", value)
@@ -811,18 +810,18 @@ const TimeTrackingPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {projects.map((p) => (
-                    <SelectItem key={p.uuid_id} value={p.uuid_id}>
+                    <SelectItem key={p.id} value={p.id}>
                       {p.nombre}
                     </SelectItem>
                   ))}
-                  <SelectItem value="OTROS">OTROS (No listado)</SelectItem>
+                  <SelectItem value="OTRO">OTRO (No listado)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {modalFormData.is_other_project && (
               <div>
                 <Label htmlFor="other_project_details">
-                  Detalles del Proyecto "OTROS"
+                  Detalles del Proyecto "OTRO"
                 </Label>
                 <Input
                   id="other_project_details"

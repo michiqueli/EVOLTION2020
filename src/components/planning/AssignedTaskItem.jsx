@@ -1,9 +1,5 @@
 import React, { useState } from "react";
-import {
-  MoreVertical,
-  Trash2,
-  Info,
-} from "lucide-react";
+import { MoreVertical, Trash2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,9 +19,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { useUser } from "@/contexts/UserContext";
 
 export const AssignedTaskItem = React.memo(
   ({
@@ -37,11 +33,17 @@ export const AssignedTaskItem = React.memo(
     employeesList,
   }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
+    const { user, ROLES } = useUser();
+    const isAdminOrCEO =
+      user &&
+      (user.rol === ROLES.ADMIN ||
+        user.rol === ROLES.CEO ||
+        user.rol === ROLES.DEVELOPER);
     const employeeName =
       employeesList.find((e) => e.id === employeeId)?.nombre || employeeId;
-    const formattedDayForDisplay = day.fullDate ? format(day.fullDate, 'EEEE d \'de\' MMMM', { locale: es }) : day.dayName;
-
+    const formattedDayForDisplay = day.fullDate
+      ? format(day.fullDate, "EEEE d 'de' MMMM", { locale: es })
+      : day.dayName;
 
     return (
       <>
@@ -70,18 +72,22 @@ export const AssignedTaskItem = React.memo(
               >
                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onShowTaskDetails(task.projectId)}>
+                <DropdownMenuItem
+                  onClick={() => onShowTaskDetails(task.projectId)}
+                >
                   <Info className="mr-2 h-3.5 w-3.5" />
                   Info Obra
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-3.5 w-3.5" />
-                  Eliminar
-                </DropdownMenuItem>
+                {isAdminOrCEO && (
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                    Eliminar
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -100,14 +106,21 @@ export const AssignedTaskItem = React.memo(
               <AlertDialogDescription>
                 La tarea "{task.title}" será eliminada de la planificación de{" "}
                 <span className="font-semibold">{employeeName}</span> para el{" "}
-                <span className="font-semibold">{formattedDayForDisplay}</span>. {/* <--- CAMBIO AQUÍ */}
+                <span className="font-semibold">{formattedDayForDisplay}</span>.{" "}
+                {/* <--- CAMBIO AQUÍ */}
                 Esta acción no se puede deshacer.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => onRemoveTask(employeeId, day.fullDate.toISOString().split('T')[0], task.instanceId)} // <--- Asegúrate que onRemoveTask reciba la fecha formateada si la usa como clave
+                onClick={() =>
+                  onRemoveTask(
+                    employeeId,
+                    day.fullDate.toISOString().split("T")[0],
+                    task.instanceId
+                  )
+                } // <--- Asegúrate que onRemoveTask reciba la fecha formateada si la usa como clave
                 className="bg-destructive hover:bg-destructive/90"
               >
                 Eliminar
