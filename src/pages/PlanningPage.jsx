@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { PlanningGrid } from "@/components/planning/PlanningGrid";
 import { supabase } from "@/lib/supabaseClient";
-import { ROLES } from "@/contexts/UserContext";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -154,6 +153,7 @@ const PlanningPage = () => {
     const days = eachDayOfInterval({ start: startDate, end: endDate });
     const formattedDates = days.map((date) => ({
       fullDate: date,
+      isoDate: format(date, "yyyy-MM-dd"),
       dayName: format(date, "EEE", { locale: es }),
       dayOfMonth: format(date, "d", { locale: es }),
       monthName: format(date, "MMM", { locale: es }),
@@ -283,29 +283,30 @@ const PlanningPage = () => {
   }, [startDate, endDate, employees, projects, projectColors, vehicles, toast]);
 
   const onAssignTask = useCallback(
-    async (projectId, employeeId, dayObjectOrISOString) => {
+    async (projectId, employeeId, dayObject) => {
+      // Recibimos el objeto completo del día
       const project = projects.find((p) => p.id === projectId);
       if (!project) return;
-      const fullDate =
-        typeof dayObjectOrISOString === "object" &&
-        dayObjectOrISOString.fullDate
-          ? dayObjectOrISOString.fullDate
-          : new Date(dayObjectOrISOString);
-      const dayISOString = format(fullDate, "yyyy-MM-dd");
+
+      // --- LÓGICA SIMPLIFICADA Y CORREGIDA ---
+      // Usamos directamente el string de la fecha, sin conversiones de zona horaria.
+      const dayISOString = dayObject.isoDate;
+
       const colorInfo = projectColors[projectId] || TASK_COLORS[0];
       const newDbAssignment = {
         usuario_id: employeeId,
         proyecto_id: projectId,
-        assignment_date: dayISOString,
-        assigned_by: user.id,
+        assignment_date: dayISOString, // <-- Guardamos el string limpio
         metadata: { color: colorInfo.class },
       };
+
       try {
         const { data, error } = await supabase
           .from("planificaciones")
           .insert([newDbAssignment])
           .select("*")
           .single();
+
         if (error) throw error;
 
         const assignedProject = projects.find((p) => p.id === data.proyecto_id);
@@ -335,14 +336,14 @@ const PlanningPage = () => {
             },
           ],
         }));
+
+        const dateForToast = new Date(dayISOString + "T12:00:00Z"); // Creamos una fecha neutral para el toast
         toast({
           title: "Tarea asignada",
           description: `"${project.nombre}" asignada a ${
-            employees.find((e) => e.id === employeeId)?.nombre ||
-            "Empleado Desconocido"
-          } el ${format(fullDate, "EEE d MMM", { locale: es })}.`,
-          duration: 3000,
-          variant: 'success'
+            employees.find((e) => e.id === employeeId)?.nombre
+          } el ${format(dateForToast, "EEE d MMM", { locale: es })}.`,
+          variant: "success",
         });
       } catch (error) {
         console.error("Error saving assignment to DB:", error);
@@ -829,10 +830,7 @@ const PlanningPage = () => {
                 const isAssignedToCurrentProject = projects
                   .find((p) => p.id === currentProjectForVehicle)
                   ?.vehiculos_asignados?.includes(vehicle.id);
-                const isAssignedToAnotherProject =
-                  !isAssignedToCurrentProject &&
-                  assignedVehicleIds.has(vehicle.id);
-                if (isAssignedToAnotherProject) {
+                if (isAssignedToCurrentProject) {
                   return (
                     <div
                       key={vehicle.id}
@@ -841,7 +839,7 @@ const PlanningPage = () => {
                       <Car className="h-4 w-4 text-gray-400" />
                       {vehicle.numero_interno} - {vehicle.patente}{" "}
                       <span className="ml-auto text-xs">
-                        (Asignado a otra obra)
+                        (Ya esta asignado a esta obra)
                       </span>
                     </div>
                   );
