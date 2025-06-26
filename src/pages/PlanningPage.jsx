@@ -41,8 +41,9 @@ import {
   subMonths,
   endOfWeek,
 } from "date-fns";
-import { es } from "date-fns/locale";
+import { es, is } from "date-fns/locale";
 import { exportToExcel } from "@/lib/exportPlanningToExcel";
+import { useUser } from "@/contexts/UserContext";
 
 const TASK_COLORS = [
   { class: "bg-blue-400/70 border border-blue-600/30", hex: "FF60A5FA" },
@@ -79,7 +80,12 @@ const RANGE_OPTIONS = [
 
 const PlanningPage = () => {
   const { toast } = useToast();
-
+  const { user, ROLES } = useUser();
+  const isAdminOrCEO =
+    user &&
+    (user.rol === ROLES.ADMIN ||
+      user.rol === ROLES.CEO ||
+      user.rol === ROLES.DEVELOPER);
   const [assignments, setAssignments] = useState({});
   const [vehicles, setVehicles] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -218,7 +224,7 @@ const PlanningPage = () => {
         const { data, error } = await supabase
           .from("planificaciones")
           .select(
-            `id, usuario_id, proyecto_id, assignment_date, notas, metadata, proyectos ( nombre, vehiculos_asignados, default_start_time )`
+            `id, usuario_id, proyecto_id, assignment_date, metadata, proyectos ( nombre, vehiculos_asignados, default_start_time )`
           )
           .gte("assignment_date", startISO)
           .lte("assignment_date", endISO)
@@ -255,7 +261,6 @@ const PlanningPage = () => {
             projectVehicles: vehicleDisplays,
             projectStartTime: dbAssignment.proyectos?.default_start_time,
             assignedDate: dbAssignment.assignment_date,
-            notes: dbAssignment.notas,
           });
         });
         setAssignments(loadedAssignments);
@@ -292,7 +297,7 @@ const PlanningPage = () => {
         usuario_id: employeeId,
         proyecto_id: projectId,
         assignment_date: dayISOString,
-        notas: null,
+        assigned_by: user.id,
         metadata: { color: colorInfo.class },
       };
       try {
@@ -327,7 +332,6 @@ const PlanningPage = () => {
               projectVehicles: vehicleDisplays,
               projectStartTime: assignedProject?.default_start_time,
               assignedDate: data.assignment_date,
-              notes: data.notas,
             },
           ],
         }));
@@ -338,6 +342,7 @@ const PlanningPage = () => {
             "Empleado Desconocido"
           } el ${format(fullDate, "EEE d MMM", { locale: es })}.`,
           duration: 3000,
+          variant: 'success'
         });
       } catch (error) {
         console.error("Error saving assignment to DB:", error);
@@ -376,6 +381,7 @@ const PlanningPage = () => {
         toast({
           title: "Tarea eliminada",
           description: "La tarea ha sido eliminada de la planificación.",
+          variant: "destructive",
           duration: 3000,
         });
       } catch (error) {
@@ -705,7 +711,11 @@ const PlanningPage = () => {
                   return (
                     <div
                       key={project.id}
-                      onClick={() => onShowTaskDetails(project.id)}
+                      onClick={
+                        isAdminOrCEO
+                          ? () => onShowTaskDetails(project.id)
+                          : false
+                      }
                       className="grid grid-cols-[1fr,auto] md:grid-cols-[2fr_1fr_2fr] gap-4 items-center p-4 bg-muted/50 rounded-lg border cursor-pointer hover:bg-muted/60 transition-colors"
                     >
                       <div className="flex items-center gap-2">
@@ -723,23 +733,27 @@ const PlanningPage = () => {
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Clock className="h-4 w-4 text-muted-foreground" />
-                        <Select
-                          value={project.default_start_time || ""}
-                          onValueChange={(value) =>
-                            handleStartTimeChange(project.id, value)
-                          }
-                        >
-                          <SelectTrigger className="w-[120px]">
-                            <SelectValue placeholder="Hora Ini." />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-48 overflow-y-auto">
-                            {timeOptions.map((time) => (
-                              <SelectItem key={time} value={time}>
-                                {time}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {isAdminOrCEO ? (
+                          <Select
+                            value={project.default_start_time || ""}
+                            onValueChange={(value) =>
+                              handleStartTimeChange(project.id, value)
+                            }
+                          >
+                            <SelectTrigger className="w-[120px]">
+                              <SelectValue placeholder="Hora Ini." />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-48 overflow-y-auto">
+                              {timeOptions.map((time) => (
+                                <SelectItem key={time} value={time}>
+                                  {time}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <h1>{project.default_start_time}</h1>
+                        )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         {assignedVehicleIdsToProject.map((vId) => {
@@ -751,31 +765,35 @@ const PlanningPage = () => {
                             >
                               <Car className="h-4 w-4 mr-1.5 text-blue-600" />
                               {display.numero_interno} - {display.patente}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeVehicleFromProject(project.id, vId);
-                                }}
-                                className="ml-2 -mr-1 h-5 w-5 rounded-full bg-blue-200 text-blue-800 hover:bg-blue-300 flex items-center justify-center transition-colors"
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </button>
+                              {isAdminOrCEO && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeVehicleFromProject(project.id, vId);
+                                  }}
+                                  className="ml-2 -mr-1 h-5 w-5 rounded-full bg-blue-200 text-blue-800 hover:bg-blue-300 flex items-center justify-center transition-colors"
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </button>
+                              )}
                             </span>
                           ) : null;
                         })}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-1.5 text-sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openAddVehicleModal(project.id);
-                          }}
-                        >
-                          <PlusCircle className="h-4 w-4" />
-                          Asignar Vehículo
-                        </Button>
+                        {isAdminOrCEO && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-1.5 text-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openAddVehicleModal(project.id);
+                            }}
+                          >
+                            <PlusCircle className="h-4 w-4" />
+                            Asignar Vehículo
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );

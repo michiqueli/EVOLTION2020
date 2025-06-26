@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { format } from "date-fns";
 
 const UserContext = createContext();
 
@@ -21,23 +22,22 @@ export const UserProvider = ({ children }) => {
   const [activeProjectId, setActiveProjectId] = useState(() =>
     localStorage.getItem("activeProjectId")
   );
+  const [isOtherProject, setIsOtherProject] = useState(false);
+
   useEffect(() => {
     if (activeProjectId)
       localStorage.setItem("activeProjectId", activeProjectId);
     else localStorage.removeItem("activeProjectId");
   }, [activeProjectId]);
 
-  const [activeProjectType, setActiveProjectType] = useState(() =>
-    localStorage.getItem("activeProjectType")
-  );
   useEffect(() => {
-    if (activeProjectType)
-      localStorage.setItem("activeProjectType", activeProjectType);
-    else localStorage.removeItem("activeProjectType");
-  }, [activeProjectType]);
+      localStorage.setItem("isOtherProject", isOtherProject);
+    }, [isOtherProject]);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
@@ -47,6 +47,50 @@ export const UserProvider = ({ children }) => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    // Esta función solo se ejecutará si tenemos un usuario logueado.
+    if (user) {
+      const findTodaysProject = async () => {
+        // Obtenemos la fecha de hoy en formato YYYY-MM-DD
+        const todayString = format(new Date(), "yyyy-MM-dd");
+
+        // Buscamos en 'planificaciones' una entrada para el usuario y la fecha de hoy.
+        const { data, error } = await supabase
+          .from("planificaciones")
+          .select(`proyecto_id`)
+          .eq("usuario_id", user.id)
+          .eq("assignment_date", todayString)
+          .limit(1) // Nos quedamos con la primera que encontremos para el día
+          .single(); // Esperamos un solo resultado
+
+        if (error) {
+          // Si hay un error (ej. no se encontró ninguna fila), no es crítico. Lo mostramos en consola.
+          console.log(
+            `No se encontró planificación para el usuario ${user.id} en la fecha ${todayString}.`
+          );
+        }
+
+        if (data && data.proyecto_id) {
+          // Si encontramos un proyecto, lo establecemos como activo.
+          console.log(
+            `Proyecto del día encontrado: ${data.proyecto_id}. Estableciendo como activo.`
+          );
+          setActiveProjectId(data.proyecto_id);
+        }
+      };
+
+      // Si no hay ya un proyecto activo (quizás de localStorage o seleccionado manualmente),
+      // intentamos buscar el del día.
+      if (!activeProjectId) {
+        findTodaysProject();
+      }
+    } else {
+      // Si el usuario cierra sesión, limpiamos el proyecto activo
+      setActiveProjectId(null);
+      localStorage.removeItem("activeProjectId");
+    }
+  }, [user]); // Se dispara cad
 
   // Efecto #2: Reacciona a los cambios en 'session' para obtener y validar el perfil.
   useEffect(() => {
@@ -66,9 +110,11 @@ export const UserProvider = ({ children }) => {
             setUser({ ...session.user, ...userProfile });
           } else {
             let errorMessage = "Tu cuenta tiene un estado inválido.";
-            if (userProfile.estado === "pendiente") errorMessage = "Tu cuenta está pendiente de aprobación.";
-            if (userProfile.estado === "rechazado") errorMessage = "Tu solicitud de acceso fue rechazada.";
-            
+            if (userProfile.estado === "pendiente")
+              errorMessage = "Tu cuenta está pendiente de aprobación.";
+            if (userProfile.estado === "rechazado")
+              errorMessage = "Tu solicitud de acceso fue rechazada.";
+
             setAuthError(errorMessage);
             await supabase.auth.signOut();
             setUser(null);
@@ -83,20 +129,16 @@ export const UserProvider = ({ children }) => {
         setLoadingAuth(false);
       }
     };
-    
+
     fetchProfileAndSetUser();
   }, [session]);
-  
 
   useEffect(() => {
     if (!user) {
       localStorage.removeItem("activeProjectId");
-      localStorage.removeItem("activeProjectType");
       setActiveProjectId(null);
-      setActiveProjectType(null);
     }
   }, [user]);
-
 
   const login = async ({ email, password }) => {
     return await supabase.auth.signInWithPassword({ email, password });
@@ -108,14 +150,19 @@ export const UserProvider = ({ children }) => {
 
   const clearAuthError = () => setAuthError(null);
 
-  const setCurrentActiveProject = (projectId, projectType) => {
-    setActiveProjectId(projectId);
-    setActiveProjectType(projectType);
+  const setCurrentActiveProject = (projectId) => {
+    if (projectId === 'OTRO') {
+      setIsOtherProject(true);
+      setActiveProjectId(null);
+    } else {
+      setIsOtherProject(false);
+      setActiveProjectId(projectId);
+    }
   };
 
   const clearActiveProject = () => {
     setActiveProjectId(null);
-    setActiveProjectType(null);
+    setIsOtherProject(false);
   };
 
   const value = {
@@ -129,7 +176,7 @@ export const UserProvider = ({ children }) => {
     activeProjectId,
     setCurrentActiveProject,
     clearActiveProject,
-    activeProjectType,
+    isOtherProject
   };
 
   return (

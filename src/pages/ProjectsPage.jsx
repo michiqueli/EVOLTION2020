@@ -25,7 +25,7 @@ const initialNewProjectState = {
   observaciones: "",
   estado: "Por Iniciar",
   horas: 0,
-  proyect_type: "",
+  project_type: [],
   detalles_tipo_proyecto: {},
 };
 
@@ -49,13 +49,12 @@ const ProjectsPage = () => {
   );
   const [statusFilter, setStatusFilter] = useState("activos");
   const { toast } = useToast();
-  const [projectType, setProjectType] = useState(PROJECT_TYPES[0].value);
   const [isLoading, setIsLoading] = useState(false);
 
   const { proyectosActivos, proyectosNoActivos } = useMemo(() => {
     const statusOrder = {
       "En Proceso": 1,
-      Pausado: 2,
+      "Pausado": 2,
       "Por Iniciar": 3,
     };
 
@@ -128,10 +127,9 @@ const ProjectsPage = () => {
     setCurrentProjectData(initialNewProjectState);
     setEditingProject(null);
     setViewingProject(null);
-    setProjectType(PROJECT_TYPES[0].value);
   };
 
-  const handleSubmit = async (e, submittedProjectType) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!canManageProjects) {
       toast({ title: "Acción no permitida", variant: "destructive" });
@@ -147,10 +145,10 @@ const ProjectsPage = () => {
         descripcion: currentProjectData.descripcion,
         documentacion: currentProjectData.documentacion,
         observaciones: currentProjectData.observaciones,
-        project_type: projectType,
+        project_type: currentProjectData.project_type,
         detalles_tipo_proyecto: currentProjectData.detalles_tipo_proyecto || {},
       };
-
+      console.log(dataToSave)
       // 2. Lógica para diferenciar entre EDITAR y CREAR
       if (editingProject) {
         // --- LÓGICA DE ACTUALIZACIÓN ---
@@ -264,7 +262,6 @@ const ProjectsPage = () => {
     }
     setEditingProject(project);
     setCurrentProjectData({ ...project });
-    setProjectType(project.project_type || PROJECT_TYPES[0].value);
     setIsDetailViewOpen(false);
     setIsFormModalOpen(true);
   };
@@ -367,8 +364,6 @@ const ProjectsPage = () => {
         onSubmit={handleSubmit}
         isEditing={!!editingProject}
         canManage={canManageProjects}
-        projectType={projectType}
-        onProjectTypeChange={setProjectType}
         isLoading={isLoading}
       />
 

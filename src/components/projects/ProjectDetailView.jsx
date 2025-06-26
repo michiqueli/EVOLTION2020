@@ -91,7 +91,7 @@ const ProjectDetailView = ({ isOpen, onOpenChange, project }) => {
                 Horas Totales de Trabajo
               </h3>
               <div className="text-lg font-medium px-3 py-1.5 rounded-md inline-flex items-center">
-                {project.horas} HS
+                {project.horas.toFixed(1)} HS
               </div>
             </div>
           </div>
