@@ -114,7 +114,6 @@ export const PlanningGrid = React.memo(
         "Sábado",
         "Domingo",
       ];
-
       if (employees.length === 0) {
         gridContent = (
           <div className="flex justify-center items-center h-64 text-muted-foreground text-lg">
@@ -146,13 +145,12 @@ export const PlanningGrid = React.memo(
                       ></div>
                     );
                   }
-                  const cellKey = `${employee.id}-${
-                    day.fullDate.toISOString().split("T")[0]
-                  }`;
+                  // --- CORRECCIÓN 1 ---
+                  const cellKey = `${employee.id}-${day.isoDate}`;
                   const cellTasks = assignments[cellKey] || [];
                   return (
                     <div
-                      key={day.fullDate.toISOString()}
+                      key={day.isoDate}
                       className="border-r border-b border-border/30 min-h-[140px] flex flex-col relative"
                     >
                       <span
@@ -197,7 +195,7 @@ export const PlanningGrid = React.memo(
             </div>
             {displayDates.map((day) => (
               <div
-                key={day.fullDate.toISOString()}
+                key={day.isoDate}
                 className={cn(
                   "p-1 md:p-3 text-[10px] md:text-sm font-semibold text-primary text-center border-r border-border/30 last:border-r-0",
                   day.isToday &&
@@ -210,11 +208,9 @@ export const PlanningGrid = React.memo(
                 <span className="block text-lg md:text-xl font-bold">
                   {day.dayOfMonth}
                 </span>
-                {(day.fullDate.getDate() === 1 || !isMonthView) && (
-                  <span className="block text-xs md:text-sm text-muted-foreground capitalize">
-                    {day.monthName}.
-                  </span>
-                )}
+                <span className="block text-xs md:text-sm text-muted-foreground capitalize">
+                  {day.monthName}.
+                </span>
               </div>
             ))}
           </div>
@@ -227,12 +223,14 @@ export const PlanningGrid = React.memo(
                   </span>
                 </div>
                 {displayDates.map((day) => {
-                  const cellKey = `${employee.id}-${
-                    day.fullDate.toISOString().split("T")[0]
-                  }`;
+                  // --- CORRECCIÓN 2 ---
+                  const cellKey = `${employee.id}-${day.isoDate}`;
                   const cellTasks = assignments[cellKey] || [];
                   return (
-                    <motion.div key={cellKey} className="relative h-full">
+                    <motion.div
+                      key={cellKey}
+                      className="relative h-full border-r border-b border-border/30"
+                    >
                       <PlanningGridCell
                         tasks={cellTasks}
                         employeeId={employee.id}
