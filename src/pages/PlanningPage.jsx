@@ -113,23 +113,28 @@ const PlanningPage = () => {
     const now = new Date();
     let start, end;
 
+    // Creamos la opción una sola vez para asegurar la consistencia.
+    const weekOptions = { weekStartsOn: 1 };
+
     switch (selectedRange) {
       case "current_week":
-        start = startOfWeek(now, { weekStartsOn: 1 });
-        end = endOfWeek(now, { weekStartsOn: 1 });
+        start = startOfWeek(now, weekOptions);
+        end = endOfWeek(now, weekOptions); // <-- Forzamos Lunes como inicio
         break;
       case "last_week":
-        start = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
-        end = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
+        start = startOfWeek(subWeeks(now, 1), weekOptions);
+        end = endOfWeek(subWeeks(now, 1), weekOptions); // <-- Forzamos Lunes como inicio
         break;
       case "2_weeks_ago":
-        start = startOfWeek(subWeeks(now, 2), { weekStartsOn: 1 });
-        end = endOfWeek(subWeeks(now, 2), { weekStartsOn: 1 });
+        start = startOfWeek(subWeeks(now, 2), weekOptions);
+        end = endOfWeek(subWeeks(now, 2), weekOptions); // <-- Forzamos Lunes como inicio
         break;
       case "3_weeks_ago":
-        start = startOfWeek(subWeeks(now, 3), { weekStartsOn: 1 });
-        end = endOfWeek(subWeeks(now, 3), { weekStartsOn: 1 });
+        start = startOfWeek(subWeeks(now, 3), weekOptions);
+        end = endOfWeek(subWeeks(now, 3), weekOptions); // <-- Forzamos Lunes como inicio
         break;
+
+      // Las vistas de mes no necesitan la opción porque usan el primer y último día del mes.
       case "current_month":
         start = startOfMonth(now);
         end = endOfMonth(now);
@@ -139,20 +144,24 @@ const PlanningPage = () => {
         end = endOfMonth(subMonths(now, 1));
         break;
       default:
-        start = startOfWeek(now, { weekStartsOn: 1 });
-        end = endOfWeek(now, { weekStartsOn: 1 });
+        start = startOfWeek(now, weekOptions);
+        end = endOfWeek(now, weekOptions);
     }
+
+    // Guardamos las fechas como strings para evitar problemas de zona horaria.
     setStartDate(format(start, "yyyy-MM-dd"));
     setEndDate(format(end, "yyyy-MM-dd"));
 
     if (!selectedRange.includes("month")) {
       setSelectedEmployeeForMonthView(null);
     }
-  }, [selectedRange]);
+  }, [selectedRange, setSelectedEmployeeForMonthView]);
 
   useEffect(() => {
     if (!startDate || !endDate) return;
-    const days = eachDayOfInterval({ start: startDate, end: endDate });
+    const start = new Date(`${startDate}T00:00:00`);
+    const end = new Date(`${endDate}T00:00:00`);
+    const days = eachDayOfInterval({ start, end });
     const formattedDates = days.map((date) => ({
       fullDate: date,
       isoDate: format(date, "yyyy-MM-dd"),
