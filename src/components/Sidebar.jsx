@@ -14,6 +14,7 @@ import {
   Users as UsersIcon,
   Clock,
   UserMinus,
+  TrendingUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -94,6 +95,17 @@ const sidebarConfig = [
           ROLES.CEO,
           ROLES.SUPERVISOR,
           ROLES.WORKER,
+          ROLES.DEVELOPER,
+        ],
+      },
+      {
+        to: "/tracking",
+        label: "Seguimiento",
+        icon: TrendingUp,
+        roles: [
+          ROLES.ADMIN,
+          ROLES.CEO,
+          ROLES.SUPERVISOR,
           ROLES.DEVELOPER,
         ],
       },
