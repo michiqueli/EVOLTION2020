@@ -25,6 +25,7 @@ import TimeTrackingPage from "@/pages/hr/TimeTrackingPage";
 import AbsenceManagementPage from "@/pages/hr/AbsenceManagementPage";
 import { UserProvider, useUser, ROLES } from "@/contexts/UserContext";
 import PlanningPage from "@/pages/PlanningPage";
+import TrackingPage from "@/pages/TrackingPage";
 
 const ProtectedRoute = ({ allowedRoles }) => {
   const { user, loadingAuth } = useUser();
@@ -113,6 +114,7 @@ const AppContent = () => {
             />
           }
         >
+          <Route path="/tracking" element={<TrackingPage />} />
           <Route
             path="/tracking/:projectId"
             element={<ProjectTrackingPage />}
@@ -121,12 +123,7 @@ const AppContent = () => {
         <Route
           element={
             <ProtectedRoute
-              allowedRoles={[
-                ROLES.ADMIN,
-                ROLES.CEO,
-                ROLES.DEVELOPER,
-                ROLES.WORKER,
-              ]}
+              allowedRoles={[ROLES.ADMIN, ROLES.CEO, ROLES.DEVELOPER]}
             />
           }
         >
