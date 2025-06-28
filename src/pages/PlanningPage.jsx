@@ -100,10 +100,10 @@ const PlanningPage = () => {
   const [loadingAssignments, setLoadingAssignments] = useState(true);
   const [selectedRange, setSelectedRange] = useState("current_week");
   const [startDate, setStartDate] = useState(
-    startOfWeek(new Date(), { weekStartsOn: 1 })
+    format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd")
   );
   const [endDate, setEndDate] = useState(
-    endOfWeek(new Date(), { weekStartsOn: 1 })
+    format(endOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd")
   );
   const [displayDates, setDisplayDates] = useState([]);
   const [selectedEmployeeForMonthView, setSelectedEmployeeForMonthView] =
@@ -112,6 +112,7 @@ const PlanningPage = () => {
   useEffect(() => {
     const now = new Date();
     let start, end;
+
     switch (selectedRange) {
       case "current_week":
         start = startOfWeek(now, { weekStartsOn: 1 });
@@ -141,8 +142,9 @@ const PlanningPage = () => {
         start = startOfWeek(now, { weekStartsOn: 1 });
         end = endOfWeek(now, { weekStartsOn: 1 });
     }
-    setStartDate(start);
-    setEndDate(end);
+    setStartDate(format(start, "yyyy-MM-dd"));
+    setEndDate(format(end, "yyyy-MM-dd"));
+
     if (!selectedRange.includes("month")) {
       setSelectedEmployeeForMonthView(null);
     }
@@ -224,10 +226,10 @@ const PlanningPage = () => {
         const { data, error } = await supabase
           .from("planificaciones")
           .select(
-            `id, usuario_id, proyecto_id, assignment_date, metadata, proyectos ( nombre, vehiculos_asignados, default_start_time )`
+            `id, usuario_id, proyecto_id, assignment_date, proyectos ( nombre, vehiculos_asignados )`
           )
-          .gte("assignment_date", startISO)
-          .lte("assignment_date", endISO)
+          .gte("assignment_date", startDate)
+          .lte("assignment_date", endDate)
           .order("assignment_date", { ascending: true });
 
         if (error) throw error;
@@ -284,19 +286,16 @@ const PlanningPage = () => {
 
   const onAssignTask = useCallback(
     async (projectId, employeeId, dayObject) => {
-      // Recibimos el objeto completo del día
       const project = projects.find((p) => p.id === projectId);
       if (!project) return;
 
-      // --- LÓGICA SIMPLIFICADA Y CORREGIDA ---
-      // Usamos directamente el string de la fecha, sin conversiones de zona horaria.
       const dayISOString = dayObject.isoDate;
 
       const colorInfo = projectColors[projectId] || TASK_COLORS[0];
       const newDbAssignment = {
         usuario_id: employeeId,
         proyecto_id: projectId,
-        assignment_date: dayISOString, // <-- Guardamos el string limpio
+        assignment_date: dayISOString,
         metadata: { color: colorInfo.class },
       };
 
@@ -337,7 +336,7 @@ const PlanningPage = () => {
           ],
         }));
 
-        const dateForToast = new Date(dayISOString + "T12:00:00Z"); // Creamos una fecha neutral para el toast
+        const dateForToast = new Date(dayISOString + "T12:00:00Z");
         toast({
           title: "Tarea asignada",
           description: `"${project.nombre}" asignada a ${
