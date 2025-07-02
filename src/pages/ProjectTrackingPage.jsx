@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -44,28 +44,80 @@ const getStatusColor = (status) => {
 // 1. "Biblioteca" central con TODAS las métricas posibles
 const ALL_METRICS_CONFIG = {
   placas_industrial: [
-    { key: "placas_a_instalar", label: "Placas a Instalar", unit: "un." },
     {
-      key: "estructura_a_instalar",
+      key: "placas",
+      label: "Placas a Instaladar",
+      unit: "un.",
+      reportKey: "placas_instaladas",
+      targetKey: "placas_a_instalar",
+    },
+    {
+      key: "estructura",
       label: "Estructura a Instalar",
       unit: "un.",
+      reportKey: "estructura_instalada",
+      targetKey: "estructura_a_instalar",
     },
-    { key: "metros_cable", label: "Metros de Cable", unit: "mts" },
     {
-      key: "metros_canalizacion",
-      label: "Metros de Canalización",
+      key: "cable",
+      label: "Metros de Cable",
       unit: "mts",
+      reportKey: "metros_cable_tendido",
+      targetKey: "metros_cable",
+    },
+    {
+      key: "canalizacion",
+      label: "Metro de Canalización",
+      unit: "mts",
+      reportKey: "metros_canalizacion_realizada",
+      targetKey: "metros_canalizacion",
     },
   ],
   hincado: [
-    { key: "hincas", label: "Hincas Totales", unit: "un." },
-    { key: "predrilling", label: "Predrilling Totales", unit: "un." },
-    { key: "hincas_repartir", label: "Hincas a Repartir", unit: "un." },
+    {
+      key: "hincas",
+      label: "Total de Hincas",
+      unit: "un.",
+      reportKey: "hincas_realizadas",
+      targetKey: "hincas",
+    },
+    {
+      key: "predrilling",
+      label: "Total de Pre-Drilling",
+      unit: "un.",
+      reportKey: "predrilling_realizado",
+      targetKey: "predrilling",
+    },
+    {
+      key: "reparto",
+      label: "Reparto de Hincas",
+      unit: "un.",
+      reportKey: "reparto_hincas",
+      targetKey: "hincas_repartir",
+    },
   ],
   seguridad_altura: [
-    { key: "valla_perimetral", label: "Valla Perimetral", unit: "mts" },
-    { key: "escaleras_instaladas", label: "Escaleras a Instalar", unit: "un." },
-    { key: "lineas_vida", label: "Líneas de Vida", unit: "un." },
+    {
+      key: "valla",
+      label: "Total de Valla Perimetral",
+      unit: "mts",
+      reportKey: "valla_perimetral_instalada",
+      targetKey: "valla_perimetral",
+    },
+    {
+      key: "escaleras",
+      label: "Escaleras a Instalar",
+      unit: "un.",
+      reportKey: "escaleras_instaladas",
+      targetKey: "escaleras_instaladas",
+    },
+    {
+      key: "lineas",
+      label: "Líneas de Vida a Instalar",
+      unit: "un.",
+      reportKey: "lineas_de_vida_instaladas",
+      targetKey: "lineas_vida",
+    },
   ],
 };
 
@@ -84,14 +136,16 @@ const ProjectTrackingPage = () => {
   const [error, setError] = useState(null);
   const [currentProject, setCurrentProject] = useState(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [activityReports, setActivityReports] = useState([]);
 
   useEffect(() => {
-    const fetchProjectDetails = async () => {
+    const fetchAllData = async () => {
       if (!projectId) return;
       setLoading(true);
       setError(null);
       try {
-        const { data, error: projectError } = await supabase
+        // Obtenemos los detalles del proyecto
+        const { data: projectData, error: projectError } = await supabase
           .from("proyectos")
           .select(
             "uuid_id, nombre, project_type, estado, detalles_tipo_proyecto"
@@ -99,31 +153,67 @@ const ProjectTrackingPage = () => {
           .eq("uuid_id", projectId)
           .single();
         if (projectError) throw projectError;
-        setCurrentProject(data);
+        setCurrentProject(projectData);
+
+        // Obtenemos TODOS los informes diarios para este proyecto
+        const { data: reportsData, error: reportsError } = await supabase
+          .from("daily_reports")
+          .select("*")
+          .eq("project_id", projectData.uuid_id);
+        if (reportsError) throw reportsError;
+        setActivityReports(reportsData || []);
       } catch (err) {
-        console.error("Error fetching project details:", err);
+        console.error("Error fetching project data:", err);
         toast({
           title: "Error",
-          description: "No se pudo cargar el proyecto.",
+          description: "No se pudieron cargar los datos del proyecto.",
           variant: "destructive",
         });
-        setError("No se pudo cargar el proyecto.");
+        setError("No se pudieron cargar los datos.");
       } finally {
         setLoading(false);
       }
     };
-    fetchProjectDetails();
+    fetchAllData();
   }, [projectId, toast]);
 
-  // 3. El useMemo ahora construye las métricas dinámicamente a partir del array project_type
   const metricsConfig = useMemo(() => {
-    if (!currentProject || !Array.isArray(currentProject.project_type)) {
+    if (!currentProject || !Array.isArray(currentProject.project_type))
       return [];
-    }
     return currentProject.project_type.flatMap(
       (type) => ALL_METRICS_CONFIG[type] || []
     );
   }, [currentProject]);
+
+  // --- PASO 2: useMemo PARA CALCULAR EL PROGRESO ---
+  const progressData = useMemo(() => {
+    if (activityReports.length === 0 || metricsConfig.length === 0) {
+      return { accumulated: {}, progress: {} };
+    }
+
+    const accumulated = {};
+    const progress = {};
+
+    metricsConfig.forEach(metric => {
+      // Para sumar, usamos la clave del reporte diario (reportKey)
+      accumulated[metric.key] = activityReports.reduce((sum, report) => {
+        return sum + (Number(report[metric.reportKey]) || 0);
+      }, 0);
+    });
+
+    metricsConfig.forEach(metric => {
+      // Para el objetivo, usamos la clave de los detalles del proyecto (targetKey)
+      const target = currentProject.detalles_tipo_proyecto?.[metric.targetKey] || 0;
+      
+      if (target > 0) {
+        progress[metric.key] = (accumulated[metric.key] / target) * 100;
+      } else {
+        progress[metric.key] = 0;
+      }
+    });
+
+    return { accumulated, progress };
+  }, [activityReports, metricsConfig, currentProject]);
 
   const handleStatusChange = async (newStatus) => {
     if (!currentProject || !newStatus) return;
@@ -248,11 +338,12 @@ const ProjectTrackingPage = () => {
             const target =
               getNestedValue(
                 currentProject.detalles_tipo_proyecto,
-                metric.key
+                metric.targetKey
               ) || 0;
-            // Por ahora, el acumulado y progreso son 0, como pediste.
-            const accumulated = 0;
-            const progress = 0;
+            // Obtenemos los valores reales desde nuestro nuevo objeto 'progressData'
+            const accumulated = progressData.accumulated?.[metric.key] || 0;
+            const progress = progressData.progress?.[metric.key] || 0;
+
             return (
               <div
                 key={metric.key}
@@ -272,8 +363,10 @@ const ProjectTrackingPage = () => {
                     <span>
                       Acumulado: {accumulated} {metric.unit}
                     </span>
+                    {/* Mostramos el porcentaje con un decimal */}
                     <span>{progress.toFixed(1)}%</span>
                   </div>
+                  {/* La barra de progreso ahora muestra el valor real */}
                   <Progress value={progress} className="h-2 mt-1" />
                 </div>
               </div>
@@ -281,8 +374,7 @@ const ProjectTrackingPage = () => {
           })}
           {metricsConfig.length === 0 && (
             <p className="text-muted-foreground col-span-full text-center py-4">
-              No hay métricas de seguimiento definidas para este tipo de
-              proyecto.
+              No hay métricas definidas para este tipo de proyecto.
             </p>
           )}
         </div>
