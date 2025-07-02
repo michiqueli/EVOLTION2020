@@ -406,7 +406,6 @@ const DashboardPage = () => {
     const otherTechniciansNames = techniciansNames.filter(
       (name) => name !== currentUserName
     );
-
     // --- AHORA CONSTRUIMOS COMPONENTES JSX ---
     return (
       <div className="space-y-3 text-sm">
@@ -471,6 +470,11 @@ const DashboardPage = () => {
       </div>
     );
   }, [isLoading, todaysPlanning, allVehicles, allUsers, user]);
+  
+   const goToCreateReport = () => {
+    // Navegamos y pasamos un objeto 'state' con nuestra instrucción
+    navigate('/activities', { state: { action: 'createReport' } });
+  };
 
   return (
     <div className="space-y-10 p-2">
@@ -536,7 +540,7 @@ const DashboardPage = () => {
             title="Crear Informe Diario"
             description="Registra tus actividades, avances e incidencias de la jornada laboral."
             icon={FilePenLine}
-            onClick={() => navigate("/activities?action=new")}
+            onClick={goToCreateReport}
             buttonTittle="Crear ahora"
           />
         </motion.div>
