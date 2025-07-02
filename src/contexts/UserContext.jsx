@@ -106,13 +106,13 @@ export const UserProvider = ({ children }) => {
 
           if (error) throw error;
 
-          if (userProfile.estado === "aceptado") {
+          if (userProfile.estado === "Aceptado") {
             setUser({ ...session.user, ...userProfile });
           } else {
             let errorMessage = "Tu cuenta tiene un estado inválido.";
-            if (userProfile.estado === "pendiente")
+            if (userProfile.estado === "Pendiente")
               errorMessage = "Tu cuenta está pendiente de aprobación.";
-            if (userProfile.estado === "rechazado")
+            if (userProfile.estado === "Rechazado")
               errorMessage = "Tu solicitud de acceso fue rechazada.";
 
             setAuthError(errorMessage);
