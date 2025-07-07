@@ -21,6 +21,12 @@ import {
 } from "lucide-react";
 import { ALL_METRICS_CONFIG } from "@/lib/planningConfig";
 
+const isImageFile = (fileName) => {
+  if (!fileName) return false;
+  const validExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
+  return validExtensions.some((ext) => fileName.toLowerCase().endsWith(ext));
+};
+
 // Función auxiliar para parsear el texto de comentarios en secciones
 const parseComments = (text) => {
   if (!text) {
@@ -143,7 +149,7 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
     projectTypes.forEach((type) => {
       const metricsForType = ALL_METRICS_CONFIG[type] || [];
       metricsForType.forEach((metric) => {
-        const value = activity[metric.reportKey];   
+        const value = activity[metric.reportKey];
         if (value && Number(value) > 0) {
           activitiesList.push(
             `${metric.actionPhrase} ${value} ${metric.unit} de ${metric.item}`
@@ -155,7 +161,6 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
   }, [activity]);
 
   // Procesamos los datos una sola vez
-  console.log(activity)
   const { description, incidents, requests } = parseComments(
     activity.comentario_libre
   );
@@ -173,13 +178,30 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
       const docWidth = doc.internal.pageSize.getWidth();
       const docHeight = doc.internal.pageSize.getHeight();
       const margin = 15;
-      let y = 20;
+      let y = 55; // Empezamos a escribir más abajo para dejar espacio al membrete
 
-      // --- PÁGINA 1 ---
       await addBackgroundImage(doc, docWidth, docHeight);
 
-      // Encabezado
-      y += 15;
+      // --- LÓGICA DE FECHA CORREGIDA ---
+      // 1. Damos formato a la fecha
+      const reportDateFormatted = new Date(
+        activity.report_date + "T12:00:00Z"
+      ).toLocaleDateString("es-ES", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+
+      // 2. La dibujamos en la posición 'y' actual
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(reportDateFormatted, docWidth - margin, y, { align: "right" });
+
+      // 3. Incrementamos 'y' para que el título aparezca debajo
+      y += 20;
+
+      // Título del Proyecto
       doc.setFontSize(18);
       doc.setTextColor(40);
       doc.text(`INFORME DIARIO: ${projectName}`, docWidth / 2, y, {
@@ -189,7 +211,6 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
       doc.setDrawColor(200);
       doc.line(margin, y, docWidth - margin, y);
       y += 10;
-
       const addSection = (title, content, options = {}) => {
         if (!content || content.length === 0) return;
 
@@ -199,7 +220,7 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
         if (y + titleHeight + contentHeight > docHeight - margin) {
           doc.addPage();
           addBackgroundImage(doc, docWidth, docHeight);
-          y = 20; // Posición vertical inicial en nueva página
+          y = 60; // Posición vertical inicial en nueva página
         }
 
         doc.setFontSize(12);
@@ -214,8 +235,12 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
         y += textLines.length * 5 + 10;
       };
 
+      const activitiesText = performedActivities.join("\n");
       // Secciones de texto
-      addSection("1. DESCRIPCIÓN DE ACTIVIDADES REALIZADAS", description);
+      await addSection(
+        "1. ACTIVIDADES REALIZADAS",
+        activitiesText || "No se reportaron cantidades para este día."
+      );
 
       if (assignedTeam.length > 0) {
         let teamText = assignedTeam
@@ -232,6 +257,8 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
         incidents || "No se registraron incidencias."
       );
 
+      await addSection("2. COMENTARIOS ADICIONALES", description);
+
       // Firma
       addSection(
         "5. FIRMA DEL RESPONSABLE",
@@ -242,33 +269,65 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
       if (images.length > 0) {
         doc.addPage();
         await addBackgroundImage(doc, docWidth, docHeight);
-        y = 20;
+        y = 60;
         doc.setFontSize(12);
         doc.setFont(undefined, "bold");
         doc.text("4. REGISTRO FOTOGRÁFICO", margin, y);
         y += 10;
 
         for (const img of images) {
-          const imgHeight = 80;
-          const imgWidth = 120;
-          if (y + imgHeight + 10 > docHeight - margin) {
-            doc.addPage();
-            await addBackgroundImage(doc, docWidth, docHeight);
-            y = 20;
-          }
           try {
-            // jsPDF puede cargar imágenes desde URLs si el CORS es correcto
+            // 1. Cargamos la imagen para poder leer sus dimensiones originales
+            const image = new Image();
+            image.crossOrigin = "Anonymous"; // Importante para cargar imágenes de otras URLs
+            image.src = img.url;
+            await new Promise((resolve, reject) => {
+              image.onload = resolve;
+              img.onerror = (err) =>
+                reject(new Error("No se pudo cargar la imagen."));
+            });
+
+            // 2. Definimos el área MÁXIMA en la que queremos que quepa la imagen
+            const maxWidth = 90; // Ancho máximo en mm (casi todo el ancho de la página A4)
+            const maxHeight = 80; // Alto máximo en mm
+
+            // 3. Calculamos las nuevas dimensiones manteniendo la proporción
+            let imgWidth = image.naturalWidth;
+            let imgHeight = image.naturalHeight;
+            const ratio = imgWidth / imgHeight;
+
+            if (imgWidth > maxWidth) {
+              imgWidth = maxWidth;
+              imgHeight = imgWidth / ratio;
+            }
+
+            if (imgHeight > maxHeight) {
+              imgHeight = maxHeight;
+              imgWidth = imgHeight * ratio;
+            }
+
+            // 4. Comprobamos si la imagen cabe en la página actual
+            // Sumamos el alto de la imagen + 15mm para el pie de foto y espaciado
+            if (y + imgHeight + 15 > docHeight - margin) {
+              doc.addPage();
+              await addBackgroundImage(doc, docWidth, docHeight);
+              y = 30; // Reseteamos la posición vertical en la nueva página
+            }
+
+            // 5. Añadimos la imagen al PDF con sus nuevas dimensiones calculadas y centrada
             doc.addImage(
-              img.url,
-              "PNG",
-              (docWidth - imgWidth) / 2,
+              image,
+              "JPEG", // Es más seguro especificar el tipo si lo conoces, JPEG es común.
+              (docWidth - imgWidth) / 2, // Centrado horizontalmente
               y,
               imgWidth,
-              imgHeight,
-              undefined,
-              "FAST"
+              imgHeight
             );
+
+            // Incrementamos 'y' según el alto de la imagen que acabamos de añadir
             y += imgHeight + 5;
+
+            // Añadimos el nombre del archivo como pie de foto
             doc.setFontSize(9);
             doc.setTextColor(120);
             doc.text(img.name || "Imagen adjunta", docWidth / 2, y, {
@@ -281,7 +340,12 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
               img.url,
               imgError
             );
-            doc.text(`[Error al cargar imagen: ${img.name}]`, margin, y);
+            // Si una imagen falla, escribimos un error en el PDF y continuamos
+            doc.text(
+              `[Error al cargar imagen: ${img.name || "desconocido"}]`,
+              margin,
+              y
+            );
             y += 10;
           }
         }
@@ -405,11 +469,19 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
                       rel="noopener noreferrer"
                       className="block group"
                     >
-                      <img
-                        src={img.url}
-                        alt={img.name}
-                        className="w-full h-32 object-cover rounded-md border group-hover:opacity-80 transition-opacity"
-                      />
+                      {/* --- CORRECCIÓN DE IMAGEN ROTA --- */}
+                      {isImageFile(img.name) ? (
+                        <img
+                          src={img.url}
+                          alt={img.name}
+                          className="w-full h-32 object-cover rounded-md border group-hover:opacity-80"
+                        />
+                      ) : (
+                        <div className="w-full h-32 rounded-md border bg-muted flex items-center justify-center group-hover:bg-muted/80">
+                          <FileText className="h-10 w-10 text-muted-foreground" />
+                        </div>
+                      )}
+
                       <p
                         className="text-xs text-center text-muted-foreground mt-1 truncate"
                         title={img.name}

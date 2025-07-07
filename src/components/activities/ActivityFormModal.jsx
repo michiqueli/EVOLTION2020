@@ -178,7 +178,6 @@ export const ActivityFormModal = ({
   const [filePreviews, setFilePreviews] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-
   useEffect(() => {
     if (isOpen) {
       if (isEditing && existingActivity) {
@@ -200,7 +199,7 @@ export const ActivityFormModal = ({
         setFormData({
           project_id: preSelectedProject?.uuid_id || null,
           report_date: new Date().toISOString().split("T")[0],
-          user_id: user.uuid_id,
+          user_id: user.user_id,
         });
         setFilePreviews([]);
       }
