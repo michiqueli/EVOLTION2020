@@ -47,7 +47,7 @@ const ActivitiesPage = () => {
 
       const { data: activitiesData, error: actError } = await supabase
         .from("daily_reports")
-        .select("*, proyectos(nombre, project_type)")
+        .select("*, proyectos(id, nombre, project_type), creador:user_id(nombre)")
         .order("report_date", { ascending: false });
       if (actError) throw actError;
       setActivities(activitiesData || []);
@@ -144,11 +144,6 @@ const ActivitiesPage = () => {
   const openDeleteDialog = (activity) => {
     setActivityToDelete(activity);
     setIsDeleteDialogOpen(true);
-  };
-
-  const resetAndCloseForms = () => {
-    setIsFormModalOpen(false);
-    setEditingActivity(null);
   };
 
   const handleViewActivity = (activity) => {

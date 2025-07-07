@@ -21,6 +21,7 @@ import {
 import { Loader2 } from "lucide-react";
 import FileUploadSection from "@/components/activities/FileUploadSection";
 import { useUser } from "@/contexts/UserContext";
+import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 
 // Sub-componentes de formulario para mantener el código limpio
@@ -173,6 +174,7 @@ export const ActivityFormModal = ({
   const { user, activeProjectId } = useUser();
   const [selectedProject, setSelectedProject] = useState(null);
   const [formData, setFormData] = useState({});
+  const { toast } = useToast();
   const [filePreviews, setFilePreviews] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -198,7 +200,7 @@ export const ActivityFormModal = ({
         setFormData({
           project_id: preSelectedProject?.uuid_id || null,
           report_date: new Date().toISOString().split("T")[0],
-          user_id: user.id,
+          user_id: user.uuid_id,
         });
         setFilePreviews([]);
       }
@@ -243,7 +245,7 @@ export const ActivityFormModal = ({
           .getPublicUrl(storagePath);
 
         return {
-          id: storagePath, // Usamos el path del storage como ID único y permanente
+          id: storagePath,
           name: file.name,
           url: publicUrl,
           storagePath: storagePath,
@@ -251,7 +253,6 @@ export const ActivityFormModal = ({
         };
       } catch (error) {
         console.error("Error al subir el archivo:", file.name, error);
-        // Devolvemos un objeto de error para poder identificarlo después
         return { name: file.name, status: "error" };
       }
     });
@@ -318,18 +319,13 @@ export const ActivityFormModal = ({
         });
 
       const newUploadedFiles = await Promise.all(uploadPromises);
-
-      // 2. Combinamos con los archivos que ya estaban subidos
       const existingFiles = filePreviews.filter((p) => p.url);
       const allFiles = [...existingFiles, ...newUploadedFiles];
-
-      // 3. Preparamos el objeto final para guardar
       const { id, created_at, proyectos, ...dataToSave } = formData;
       const finalData = { ...dataToSave, imagenes: JSON.stringify(allFiles) };
 
-      // 4. Llamamos a la función del padre con los datos listos
       await onSubmit(finalData, existingActivity?.id);
-      onOpenChange(false); // Cerramos el modal solo si todo fue bien
+      onOpenChange(false);
     } catch (err) {
       console.error("Error en el submit del modal:", err);
       toast({
@@ -345,6 +341,10 @@ export const ActivityFormModal = ({
   const handleProjectSelection = (projectId) => {
     const project = projects.find((p) => p.uuid_id === projectId);
     setSelectedProject(project);
+    setFormData((prev) => ({
+      ...prev,
+      project_id: project ? project.uuid_id : null,
+    }));
   };
 
   return (

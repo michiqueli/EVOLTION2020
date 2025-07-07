@@ -569,14 +569,14 @@ const DashboardPage = () => {
             buttonTittle="Ver ahora"
           />
         </motion.div>
-        <StatCard
+        {/*<StatCard
           title="Alertas"
           value="3"
           icon={AlertTriangle}
           color="bg-destructive"
           hoverColor="hsl(var(--destructive)/0.1)"
           description="Requieren atención inmediata"
-        />
+        />*/}
       </div>
     </div>
   );
