@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, FileText, Search } from 'lucide-react';
-import ProjectCard from '@/components/projects/ProjectCard'; // Reut
+import ProjectTrackingCard from '@/components/tracking/ProjectTrackingCard'; // Reut
 
 const TrackingPage = () => {
   const navigate = useNavigate();
@@ -86,7 +86,7 @@ const TrackingPage = () => {
             {proyectosActivos.length > 0 ? (
               <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" layout>
                 {proyectosActivos.map(project => (
-                  <ProjectCard 
+                  <ProjectTrackingCard 
                     key={project.id} 
                     project={project} 
                     onViewDetails={handleSelectProject}
@@ -106,7 +106,7 @@ const TrackingPage = () => {
               <h2 className="text-2xl font-semibold text-foreground mb-4 border-b pb-2">Proyectos no Activos</h2>
               <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" layout>
                 {proyectosNoActivos.map(project => (
-                  <ProjectCard 
+                  <ProjectTrackingCard 
                     key={project.id} 
                     project={project}
                     isInactivo={true}

@@ -1,209 +1,309 @@
-import React, { useState, useEffect, useRef } from "react"; // Importa useRef
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button"; // Asegúrate de tener este componente de botón
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
-
-// Importa las librerías para generar PDF
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import {
+  Users,
+  AlertTriangle,
+  Image as ImageIcon,
+  FileText,
+  Zap,
+  ClipboardSignature,
+} from "lucide-react";
+import { ALL_METRICS_CONFIG } from "@/lib/planningConfig";
 
-const ActivityDetailModal = ({
-  isOpen,
-  onClose,
-  activity,
-  activityBranches,
-}) => {
-  // Si no hay actividad, no renderizamos nada
+// Función auxiliar para parsear el texto de comentarios en secciones
+const parseComments = (text) => {
+  if (!text) {
+    return { description: "", incidents: "", requests: "" };
+  }
+
+  let remainingText = text;
+  let incidents = "";
+  let requests = "";
+
+  const incidentKeywords = ["incidencias:", "incidencia:"];
+  const requestKeywords = ["solicitud:", "solicitudes:"];
+
+  // Función para extraer una sección y quitarla del texto principal
+  const extractSection = (keywords, currentText) => {
+    const lowerCaseText = currentText.toLowerCase();
+    for (const keyword of keywords) {
+      const keywordIndex = lowerCaseText.indexOf(keyword);
+      if (keywordIndex !== -1) {
+        const sectionText = currentText
+          .substring(keywordIndex + keyword.length)
+          .trim();
+        const mainText = currentText.substring(0, keywordIndex).trim();
+        return { mainText, sectionText };
+      }
+    }
+    return { mainText: currentText, sectionText: "" };
+  };
+
+  // Extraer incidencias primero
+  const incidentResult = extractSection(incidentKeywords, remainingText);
+  remainingText = incidentResult.mainText;
+  incidents = incidentResult.sectionText;
+
+  // Extraer solicitudes del texto restante (o de las incidencias si estaba anidado)
+  const requestResult = extractSection(
+    requestKeywords,
+    incidents || remainingText
+  );
+  requests = requestResult.sectionText;
+
+  // Limpiar el texto de incidencias si la solicitud estaba dentro
+  if (incidents && requests) {
+    incidents = requestResult.mainText;
+  } else {
+    remainingText = requestResult.mainText;
+  }
+
+  return { description: remainingText, incidents, requests };
+};
+
+// Función para añadir la imagen de fondo a una página del PDF
+const addBackgroundImage = async (pdf, docWidth, docHeight) => {
+  try {
+    const backgroundUrl = "/membrete.jpg"; // ¡IMPORTANTE! Reemplaza con la ruta a tu imagen en la carpeta /public
+    // Necesitamos cargar la imagen para obtener sus dimensiones
+    const img = new Image();
+    img.src = backgroundUrl;
+    await new Promise((resolve) => (img.onload = resolve));
+    // Añadimos la imagen cubriendo toda la página
+    pdf.addImage(img, "PNG", 0, 0, docWidth, docHeight, undefined, "FAST");
+  } catch (e) {
+    console.error(
+      "No se pudo cargar la imagen de fondo. Asegúrate que la ruta es correcta en la carpeta /public.",
+      e
+    );
+  }
+};
+
+const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
+  const { toast } = useToast();
+  const [assignedTeam, setAssignedTeam] = useState([]);
+  const [loadingTeam, setLoadingTeam] = useState(true);
+  // useEffect para buscar los compañeros de equipo que ficharon ese día en ese proyecto
+  useEffect(() => {
+    if (isOpen && activity?.project_id && activity?.report_date) {
+      const fetchTeamWhoWorked = async () => {
+        setLoadingTeam(true);
+        try {
+          const projectIntId = activity?.proyectos?.id;
+          if (!projectIntId) {
+            console.log(
+              "Esperando los detalles completos del proyecto para buscar el equipo..."
+            );
+            setAssignedTeam([]); // Dejamos la lista de equipo vacía
+            return; // Salimos de la función tempranamente
+          }
+
+          const { data, error } = await supabase
+            .from("time_tracking")
+            .select("usuarios!time_tracking_user_id_fkey(nombre, rol)")
+            .eq("project_id", projectIntId)
+            .eq("date", activity.report_date);
+
+          if (error) throw error;
+          // Eliminamos duplicados por si alguien fichó más de una vez
+          const uniqueUsers = Array.from(
+            new Map(
+              data.map((item) => [item.usuarios.nombre, item.usuarios])
+            ).values()
+          );
+          setAssignedTeam(uniqueUsers || []);
+        } catch (error) {
+          console.error("Error fetching team members:", error);
+          setAssignedTeam([]);
+        } finally {
+          setLoadingTeam(false);
+        }
+      };
+      fetchTeamWhoWorked();
+    }
+  }, [isOpen, activity]);
+
   if (!activity) return null;
 
-  const { toast } = useToast();
-  const [projectName, setProjectName] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorFetching, setErrorFetching] = useState(null);
+  const performedActivities = useMemo(() => {
+    const activitiesList = [];
+    const projectTypes = activity.proyectos?.project_type || [];
 
-  // Ref para el contenido que se convertirá a PDF
-  const pdfContentRef = useRef(null);
-
-  const fetchProject = async () => {
-    try {
-      setIsLoading(true);
-      setErrorFetching(null);
-
-      // Si no hay un ID de proyecto asociado, mostramos un mensaje
-      if (!activity.proyecto_id) {
-        setProjectName("No hay un Proyecto Asociado.");
-        setIsLoading(false);
-        return;
-      }
-
-      // Buscamos el proyecto directamente en la tabla 'proyectos' por su ID
-      const { data, error } = await supabase
-        .from("proyectos")
-        .select("nombre") // Selecciona el campo 'nombre'
-        .eq("id", activity.proyecto_id)
-        .single(); // Esperamos un único resultado
-
-      if (error) throw error;
-
-      if (data) {
-        setProjectName(data.nombre);
-      } else {
-        setProjectName("Proyecto No encontrado");
-      }
-    } catch (error) {
-      console.error("Error al buscar el proyecto:", error);
-      setErrorFetching(error.message);
-      toast({
-        title: "Error al buscar proyecto",
-        description: error.message,
-        variant: "destructive",
+    projectTypes.forEach((type) => {
+      const metricsForType = ALL_METRICS_CONFIG[type] || [];
+      metricsForType.forEach((metric) => {
+        const value = activity[metric.reportKey];   
+        if (value && Number(value) > 0) {
+          activitiesList.push(
+            `${metric.actionPhrase} ${value} ${metric.unit} de ${metric.item}`
+          );
+        }
       });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    });
+    return activitiesList;
+  }, [activity]);
 
-  useEffect(() => {
-    // Ejecuta fetchProject solo cuando el modal esté abierto y 'activity' esté disponible
-    if (isOpen && activity) {
-      fetchProject();
-    }
-    // Añadimos isOpen y activity.proyecto_id a las dependencias para re-fetch si cambian
-  }, [isOpen, activity?.proyecto_id]);
+  // Procesamos los datos una sola vez
+  console.log(activity)
+  const { description, incidents, requests } = parseComments(
+    activity.comentario_libre
+  );
+  const images = activity.imagenes ? JSON.parse(activity.imagenes) : [];
+  const projectName = activity.proyectos?.nombre || "Proyecto no especificado";
+  const creatorName = activity.creador?.nombre || "No especificado";
 
-  const getBranchName = (branchId) => {
-    return (
-      activityBranches.find((b) => b.id === branchId)?.name || "Desconocido"
-    );
-  };
-
-  // Función para generar el PDF
   const generatePdf = async () => {
-    if (!pdfContentRef.current) {
-      toast({
-        title: "Error de contenido",
-        description: "No se pudo encontrar el contenido para generar el PDF.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     toast({
       title: "Generando PDF...",
       description: "Por favor, espera un momento.",
     });
-
     try {
-      const canvas = await html2canvas(pdfContentRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
+      const doc = new jsPDF("p", "mm", "a4");
+      const docWidth = doc.internal.pageSize.getWidth();
+      const docHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      let y = 20;
+
+      // --- PÁGINA 1 ---
+      await addBackgroundImage(doc, docWidth, docHeight);
+
+      // Encabezado
+      y += 15;
+      doc.setFontSize(18);
+      doc.setTextColor(40);
+      doc.text(`INFORME DIARIO: ${projectName}`, docWidth / 2, y, {
+        align: "center",
       });
+      y += 10;
+      doc.setDrawColor(200);
+      doc.line(margin, y, docWidth - margin, y);
+      y += 10;
 
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4"); //
-      const imgWidth = 210;
-      const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+      const addSection = (title, content, options = {}) => {
+        if (!content || content.length === 0) return;
 
-      const logoUrl = "/logo_evoltion.png"; // Asegúrate de que esta ruta sea correcta
-      const logoWidth = 50; // Ancho del logo en mm
-      const logoHeight = 15; // Alto del logo en mm
-      const logoX = 10; // Posición X del logo en mm
-      const logoY = 20; // Posición Y del logo en mm
+        const titleHeight = 7;
+        const contentHeight =
+          doc.splitTextToSize(content, docWidth - margin * 2).length * 5;
+        if (y + titleHeight + contentHeight > docHeight - margin) {
+          doc.addPage();
+          addBackgroundImage(doc, docWidth, docHeight);
+          y = 20; // Posición vertical inicial en nueva página
+        }
 
-      // Agrega el logo
-      pdf.addImage(logoUrl, "PNG", logoX, logoY, logoWidth, logoHeight);
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.text(title, margin, y);
+        y += 7;
+        doc.setFontSize(11);
+        doc.setFont(undefined, "normal");
+        doc.setTextColor(80);
+        const textLines = doc.splitTextToSize(content, docWidth - margin * 2);
+        doc.text(textLines, margin, y);
+        y += textLines.length * 5 + 10;
+      };
 
-      // Título del reporte
-      pdf.setFontSize(24);
-      pdf.setTextColor(40, 40, 40); // Color de texto (RGB)
-      pdf.text("Reporte de Actividad", 70, 30); // Posición X, Y
+      // Secciones de texto
+      addSection("1. DESCRIPCIÓN DE ACTIVIDADES REALIZADAS", description);
 
-      // Línea separadora
-      pdf.setDrawColor(150, 150, 150); // Color de la línea
-      pdf.line(10, 40, 200, 40); // X1, Y1, X2, Y2
+      if (assignedTeam.length > 0) {
+        let teamText = assignedTeam
+          .map((t) => `${t.nombre} (${t.rol || "Técnico"})`)
+          .join("\n");
+        addSection(
+          "2. PERSONAL INVOLUCRADO",
+          teamText || "No se registraron fichajes para este día y proyecto."
+        );
+      }
 
-      // Información de la fecha de generación
-      pdf.setFontSize(10);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(
-        `Fecha de generación: ${new Date().toLocaleDateString("es-AR", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })}`,
-        10,
-        pageHeight - 10
+      addSection(
+        "3. INCIDENCIAS",
+        incidents || "No se registraron incidencias."
       );
-      // --- Fin Personalización ---
 
-      position = 50;
+      // Firma
+      addSection(
+        "5. FIRMA DEL RESPONSABLE",
+        `Nombre: ${creatorName}\n\nFirma: _____________________________`
+      );
 
-      if (imgHeight < pageHeight - position) {
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      } else {
-        let cursor = 0;
-        while (cursor < canvas.height) {
-          if (cursor > 0) {
-            pdf.addPage();
+      // Registro Fotográfico
+      if (images.length > 0) {
+        doc.addPage();
+        await addBackgroundImage(doc, docWidth, docHeight);
+        y = 20;
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.text("4. REGISTRO FOTOGRÁFICO", margin, y);
+        y += 10;
+
+        for (const img of images) {
+          const imgHeight = 80;
+          const imgWidth = 120;
+          if (y + imgHeight + 10 > docHeight - margin) {
+            doc.addPage();
+            await addBackgroundImage(doc, docWidth, docHeight);
+            y = 20;
           }
-          const sliceHeight = Math.min(
-            canvas.height - cursor,
-            (pageHeight - position) * (canvas.width / imgWidth)
-          );
-
-          const tempCanvas = document.createElement("canvas");
-          tempCanvas.width = canvas.width;
-          tempCanvas.height = sliceHeight;
-          const tempCtx = tempCanvas.getContext("2d");
-          tempCtx.drawImage(
-            canvas,
-            0,
-            cursor,
-            canvas.width,
-            sliceHeight,
-            0,
-            0,
-            canvas.width,
-            sliceHeight
-          );
-
-          const tempImgData = tempCanvas.toDataURL("image/png");
-
-          pdf.addImage(
-            tempImgData,
-            "PNG",
-            0,
-            position,
-            imgWidth,
-            (sliceHeight * imgWidth) / canvas.width
-          );
-          cursor += sliceHeight;
+          try {
+            // jsPDF puede cargar imágenes desde URLs si el CORS es correcto
+            doc.addImage(
+              img.url,
+              "PNG",
+              (docWidth - imgWidth) / 2,
+              y,
+              imgWidth,
+              imgHeight,
+              undefined,
+              "FAST"
+            );
+            y += imgHeight + 5;
+            doc.setFontSize(9);
+            doc.setTextColor(120);
+            doc.text(img.name || "Imagen adjunta", docWidth / 2, y, {
+              align: "center",
+            });
+            y += 10;
+          } catch (imgError) {
+            console.error(
+              "No se pudo añadir la imagen al PDF:",
+              img.url,
+              imgError
+            );
+            doc.text(`[Error al cargar imagen: ${img.name}]`, margin, y);
+            y += 10;
+          }
         }
       }
 
-      pdf.save(`Reporte_Actividad_${activity.id || "detalle"}.pdf`);
+      // Solicitud de Material
+      if (requests) {
+        doc.addPage();
+        await addBackgroundImage(doc, docWidth, docHeight);
+        y = 20;
+        addSection("SOLICITUD DE MATERIAL Y/O SERVICIO", requests);
+      }
 
-      toast({
-        title: "PDF Generado",
-        description: "El PDF se ha descargado correctamente.",
-        variant: "success",
-      });
+      doc.save(
+        `Informe-${projectName.replace(/ /g, "_")}-${activity.report_date}.pdf`
+      );
+      toast({ title: "PDF Generado", variant: "success" });
     } catch (error) {
       console.error("Error al generar el PDF:", error);
       toast({
         title: "Error al generar PDF",
-        description: `Hubo un problema al crear el PDF: ${error.message}`,
+        description: `Hubo un problema: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -211,84 +311,147 @@ const ActivityDetailModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[625px]">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Detalles de la Actividad</DialogTitle>
+          <DialogTitle className="text-primary text-2xl">
+            Detalle de Informe Diario
+          </DialogTitle>
           <DialogDescription>
-            Información detallada de la actividad realizada.
+            Informe del día{" "}
+            {new Date(activity.report_date + "T00:00:00").toLocaleDateString(
+              "es-AR",
+              { dateStyle: "long" }
+            )}
           </DialogDescription>
         </DialogHeader>
 
-        <div id="pdf-content" ref={pdfContentRef} className="p-6">
-          {" "}
-          <h2 className="text-xl font-bold mb-4 print-only">
-            Detalles de la Actividad
-          </h2>
-          <div className="mt-4 space-y-4">
+        <div className="flex-grow overflow-y-auto pr-6 space-y-6">
+          <div className="flex justify-between items-center pb-2 border-b">
             <div>
-              <h4 className="font-medium">Tipo de Trabajo</h4>
-              <p className="text-sm text-muted-foreground">
-                {getBranchName(activity.branch)}
-              </p>
+              <p className="font-bold text-lg">{projectName}</p>
+              <p className="text-muted-foreground">Informe Diario</p>
             </div>
-            <div>
-              <h4 className="font-medium">Nombre del Proyecto</h4>
-              <p className="text-sm text-muted-foreground">
-                {isLoading
-                  ? "Buscando proyecto..."
-                  : errorFetching
-                  ? `Error: ${errorFetching}`
-                  : projectName}
-              </p>
-            </div>
-            {activity.comentario_libre && (
-              <div>
-                <h4 className="font-medium">Comentarios</h4>
-                <p className="text-sm text-muted-foreground">
-                  {activity.comentario_libre}
+          </div>
+
+          <div className="space-y-6">
+            <section>
+              <h3 className="font-bold text-base mb-2 flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary" /> 1. ACTIVIDADES
+                REALIZADAS
+              </h3>
+              {performedActivities.length > 0 ? (
+                <ul className="list-disc pl-10 text-muted-foreground">
+                  {performedActivities.map((text, i) => (
+                    <li key={i}>{text}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground pl-6 italic">
+                  No se reportaron cantidades para este día.
                 </p>
-              </div>
-            )}
-            {activity.created_at && (
-              <div>
-                <h4 className="font-medium">Fecha</h4>
-                <p className="text-sm text-muted-foreground">
-                  {new Date(activity.created_at).toLocaleDateString("es-ES")}{" "}
+              )}
+            </section>
+
+            <section>
+              <h3 className="font-bold text-base mb-2 flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" /> 2. PERSONAL
+                INVOLUCRADO
+              </h3>
+              {loadingTeam ? (
+                <p className="pl-6 text-muted-foreground italic">
+                  Cargando equipo...
                 </p>
-              </div>
+              ) : (
+                <ul className="list-disc pl-10 text-muted-foreground">
+                  {assignedTeam.length > 0 ? (
+                    assignedTeam.map((member, i) => (
+                      <li key={i}>
+                        {member.nombre} ({member.rol || "Técnico"})
+                      </li>
+                    ))
+                  ) : (
+                    <li>
+                      No se registraron fichajes para este día y proyecto.
+                    </li>
+                  )}
+                </ul>
+              )}
+            </section>
+
+            {incidents && (
+              <section>
+                <h3 className="font-bold text-base mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-primary" /> 3.
+                  INCIDENCIAS
+                </h3>
+                <p className="text-muted-foreground pl-6 whitespace-pre-wrap">
+                  {incidents}
+                </p>
+              </section>
             )}
-            {activity.imagenes && JSON.parse(activity.imagenes).length > 0 && (
-              <div>
-                <h4 className="font-medium">Imágenes</h4>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {JSON.parse(activity.imagenes).map((img, index) => (
-                    <div
+
+            {images.length > 0 && (
+              <section>
+                <h3 className="font-bold text-base mb-2 flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4 text-primary" /> 4. REGISTRO
+                  FOTOGRÁFICO
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pl-6">
+                  {images.map((img, index) => (
+                    <a
                       key={index}
-                      className="w-full flex justify-center items-center overflow-hidden"
+                      href={img.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block group"
                     >
                       <img
                         src={img.url}
                         alt={img.name}
-                       
-                        className="w-[60%] h-auto rounded-md border border-gray-200"
+                        className="w-full h-32 object-cover rounded-md border group-hover:opacity-80 transition-opacity"
                       />
-                    </div>
+                      <p
+                        className="text-xs text-center text-muted-foreground mt-1 truncate"
+                        title={img.name}
+                      >
+                        {img.name}
+                      </p>
+                    </a>
                   ))}
                 </div>
+              </section>
+            )}
+
+            <section>
+              <h3 className="font-bold text-base mb-2 flex items-center gap-2">
+                <ClipboardSignature className="h-4 w-4 text-primary" /> 5. FIRMA
+                DEL RESPONSABLE
+              </h3>
+              <div className="pl-6">
+                <p>Nombre: {creatorName}</p>
+                <p className="mt-4">Firma: _____________________________</p>
               </div>
+            </section>
+
+            {requests && (
+              <section className="pt-6 border-t mt-6">
+                <h3 className="font-bold text-base mb-2 text-primary">
+                  SOLICITUD DE MATERIAL Y/O SERVICIO
+                </h3>
+                <p className="text-muted-foreground pl-6 whitespace-pre-wrap">
+                  {requests}
+                </p>
+              </section>
             )}
           </div>
         </div>
 
-        {/* Botón para exportar a PDF */}
-        <div className="flex justify-end pt-4">
-          <Button
-            onClick={generatePdf}
-            className="bg-blue-500 hover:bg-blue-600 text-white"
-          >
-            Exportar a PDF
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cerrar
           </Button>
-        </div>
+          <Button onClick={generatePdf}>Exportar a PDF</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

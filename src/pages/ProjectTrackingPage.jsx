@@ -15,6 +15,7 @@ import {
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { ALL_METRICS_CONFIG } from '@/lib/planningConfig';
 
 const projectStates = [
   "Por Iniciar",
@@ -39,86 +40,6 @@ const getStatusColor = (status) => {
     default:
       return "bg-gray-300";
   }
-};
-
-// 1. "Biblioteca" central con TODAS las métricas posibles
-const ALL_METRICS_CONFIG = {
-  placas_industrial: [
-    {
-      key: "placas",
-      label: "Placas a Instaladar",
-      unit: "un.",
-      reportKey: "placas_instaladas",
-      targetKey: "placas_a_instalar",
-    },
-    {
-      key: "estructura",
-      label: "Estructura a Instalar",
-      unit: "un.",
-      reportKey: "estructura_instalada",
-      targetKey: "estructura_a_instalar",
-    },
-    {
-      key: "cable",
-      label: "Metros de Cable",
-      unit: "mts",
-      reportKey: "metros_cable_tendido",
-      targetKey: "metros_cable",
-    },
-    {
-      key: "canalizacion",
-      label: "Metro de Canalización",
-      unit: "mts",
-      reportKey: "metros_canalizacion_realizada",
-      targetKey: "metros_canalizacion",
-    },
-  ],
-  hincado: [
-    {
-      key: "hincas",
-      label: "Total de Hincas",
-      unit: "un.",
-      reportKey: "hincas_realizadas",
-      targetKey: "hincas",
-    },
-    {
-      key: "predrilling",
-      label: "Total de Pre-Drilling",
-      unit: "un.",
-      reportKey: "predrilling_realizado",
-      targetKey: "predrilling",
-    },
-    {
-      key: "reparto",
-      label: "Reparto de Hincas",
-      unit: "un.",
-      reportKey: "reparto_hincas",
-      targetKey: "hincas_repartir",
-    },
-  ],
-  seguridad_altura: [
-    {
-      key: "valla",
-      label: "Total de Valla Perimetral",
-      unit: "mts",
-      reportKey: "valla_perimetral_instalada",
-      targetKey: "valla_perimetral",
-    },
-    {
-      key: "escaleras",
-      label: "Escaleras a Instalar",
-      unit: "un.",
-      reportKey: "escaleras_instaladas",
-      targetKey: "escaleras_instaladas",
-    },
-    {
-      key: "lineas",
-      label: "Líneas de Vida a Instalar",
-      unit: "un.",
-      reportKey: "lineas_de_vida_instaladas",
-      targetKey: "lineas_vida",
-    },
-  ],
 };
 
 const getNestedValue = (obj, path) => {
