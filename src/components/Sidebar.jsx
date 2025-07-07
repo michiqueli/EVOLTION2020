@@ -200,7 +200,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         cn(
           "flex items-center space-x-3 rounded-lg px-3 py-2.5 text-base font-medium transition-all duration-150 ease-in-out",
           isActive
-            ? "bg-gradient-to-r from-primary to-blue-500 text-primary-foreground shadow-lg scale-105"
+            ? "bg-gradient-to-r from-primary to-yellow-200 text-primary-foreground shadow-lg scale-105"
             : "text-foreground hover:bg-muted hover:text-foreground",
           !isOpen && "justify-center",
           className
@@ -269,7 +269,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-500"
+            className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-yellow-200"
           >
             EVOLTION2020
           </motion.h1>
