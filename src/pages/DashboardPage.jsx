@@ -38,7 +38,7 @@ const DashboardPage = () => {
     setCurrentActiveProject,
     clearActiveProject,
     ROLES,
-    isOtherProject
+    isOtherProject,
   } = useUser();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -219,20 +219,20 @@ const DashboardPage = () => {
 
   const handleProjectChange = (projectId) => {
     setCurrentActiveProject(projectId);
-      const project = projects.find((p) => p.id === projectId);
-      if (project) {
-        toast({
-          title: "Proyecto Activo Cambiado",
-          description: `Ahora estás trabajando en "${project.nombre}".`,
-          variant: "success",
-        });
-      } else {
-        toast({
-          title: "Proyecto Activo Cambiado",
-          description: `Seleccionaste "OTRO" como proyecto, por favor no olvides describir de que se trata.`,
-          variant: "info",
-        });
-      }
+    const project = projects.find((p) => p.id === projectId);
+    if (project) {
+      toast({
+        title: "Proyecto Activo Cambiado",
+        description: `Ahora estás trabajando en "${project.nombre}".`,
+        variant: "success",
+      });
+    } else {
+      toast({
+        title: "Proyecto Activo Cambiado",
+        description: `Seleccionaste "OTRO" como proyecto, por favor no olvides describir de que se trata.`,
+        variant: "info",
+      });
+    }
   };
 
   const actionCardVariants = {
@@ -265,7 +265,7 @@ const DashboardPage = () => {
         .from("time_tracking")
         .insert({
           user_id: user.id,
-          project_id: isOtherProject ? 'OTRO' : activeProjectId,
+          project_id: isOtherProject ? "OTRO" : activeProjectId,
           start_time: new Date().toISOString(),
           date: new Date().toISOString().split("T")[0],
           is_other_project: isOtherProject,
@@ -470,10 +470,10 @@ const DashboardPage = () => {
       </div>
     );
   }, [isLoading, todaysPlanning, allVehicles, allUsers, user]);
-  
-   const goToCreateReport = () => {
+
+  const goToCreateReport = () => {
     // Navegamos y pasamos un objeto 'state' con nuestra instrucción
-    navigate('/activities', { state: { action: 'createReport' } });
+    navigate("/activities", { state: { action: "createReport" } });
   };
 
   return (
@@ -497,24 +497,6 @@ const DashboardPage = () => {
           </p>
         </div>
       </motion.div>
-
-      {user && (user.rol === ROLES.WORKER || user.rol === ROLES.DEVELOPER) && (
-        <motion.div>
-          <ActiveTimerCard
-            projects={projects}
-            activeProjectId={activeProjectId}
-            onProjectChange={handleProjectChange}
-            isTimerActive={!!activeTimerInfo}
-            onStartTimer={handleStartTimer}
-            onStopTimer={handleStopTimer}
-            elapsedTime={elapsedTime}
-            weeklyHours={weeklyHours}
-            weeklyGoal={weeklyGoal}
-            isOtherProject={isOtherProject}
-          />
-        </motion.div>
-      )}
-
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-2">
         <motion.div
           variants={actionCardVariants}
@@ -531,6 +513,27 @@ const DashboardPage = () => {
           />
         </motion.div>
         <motion.div
+        variants={actionCardVariants}
+          initial="hidden"
+          animate="visible"
+          custom={0}>
+          <ActiveTimerCard
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onProjectChange={handleProjectChange}
+            isTimerActive={!!activeTimerInfo}
+            onStartTimer={handleStartTimer}
+            onStopTimer={handleStopTimer}
+            elapsedTime={elapsedTime}
+            weeklyHours={weeklyHours}
+            weeklyGoal={weeklyGoal}
+            isOtherProject={isOtherProject}
+          />
+        </motion.div>
+      </div>
+
+      <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-2">
+        <motion.div
           variants={actionCardVariants}
           initial="hidden"
           animate="visible"
@@ -544,9 +547,6 @@ const DashboardPage = () => {
             buttonTittle="Crear ahora"
           />
         </motion.div>
-      </div>
-
-      <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-2">
         <motion.div
           variants={actionCardVariants}
           initial="hidden"

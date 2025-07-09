@@ -123,7 +123,7 @@ const AppContent = () => {
         <Route
           element={
             <ProtectedRoute
-              allowedRoles={[ROLES.ADMIN, ROLES.CEO, ROLES.DEVELOPER]}
+              allowedRoles={[ROLES.ADMIN, ROLES.CEO, ROLES.DEVELOPER, ROLES.WORKER]}
             />
           }
         >

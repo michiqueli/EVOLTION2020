@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { format } from 'date-fns';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -198,7 +199,7 @@ export const ActivityFormModal = ({
         setSelectedProject(preSelectedProject || null);
         setFormData({
           project_id: preSelectedProject?.uuid_id || null,
-          report_date: new Date().toISOString().split("T")[0],
+          report_date: format(new Date(), 'yyyy-MM-dd'),
           user_id: user.user_id,
         });
         setFilePreviews([]);
@@ -336,7 +337,7 @@ export const ActivityFormModal = ({
       setIsSubmitting(false);
     }
   };
-
+console.log(formData)
   const handleProjectSelection = (projectId) => {
     const project = projects.find((p) => p.uuid_id === projectId);
     setSelectedProject(project);

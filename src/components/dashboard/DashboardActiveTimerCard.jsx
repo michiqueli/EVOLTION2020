@@ -32,7 +32,7 @@ export const ActiveTimerCard = ({
   return (
     <motion.div
       layout
-      className="bg-card text-card-foreground rounded-2xl shadow-lg p-6 border w-full max-w-sm mx-auto"
+      className="bg-card text-card-foreground rounded-2xl shadow-lg p-6 border w-full mx-auto"
     >
       <div className="flex justify-between items-center">
         <div className="text-center">
