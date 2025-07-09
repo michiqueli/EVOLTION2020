@@ -261,8 +261,8 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
 
       // Firma
       addSection(
-        "5. FIRMA DEL RESPONSABLE",
-        `Nombre: ${creatorName}\n\nFirma: _____________________________`
+        "5. RESPONSABLE",
+        `Nombre: ${creatorName}`
       );
 
       // Registro Fotográfico
@@ -496,12 +496,10 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
 
             <section>
               <h3 className="font-bold text-base mb-2 flex items-center gap-2">
-                <ClipboardSignature className="h-4 w-4 text-primary" /> 5. FIRMA
-                DEL RESPONSABLE
+                <ClipboardSignature className="h-4 w-4 text-primary" /> 5. RESPONSABLE
               </h3>
               <div className="pl-6">
                 <p>Nombre: {creatorName}</p>
-                <p className="mt-4">Firma: _____________________________</p>
               </div>
             </section>
 

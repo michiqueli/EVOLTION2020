@@ -630,10 +630,12 @@ const PlanningPage = () => {
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <h1 className="text-3xl font-bold text-primary">Planificación</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button onClick={handleExport} variant="outline">
-            <FileDown className="h-4 w-4 mr-2" />
-            Exportar a Excel
-          </Button>
+          {isAdminOrCEO && (
+            <Button onClick={handleExport} variant="outline">
+              <FileDown className="h-4 w-4 mr-2" />
+              Exportar a Excel
+            </Button>
+          )}
           <Select value={selectedRange} onValueChange={setSelectedRange}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Seleccionar Rango" />
