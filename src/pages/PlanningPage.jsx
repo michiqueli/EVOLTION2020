@@ -403,7 +403,7 @@ const PlanningPage = () => {
         });
       }
     },
-    [toast]
+    [toast, setAssignments]
   );
 
   const onShowTaskDetails = useCallback(
