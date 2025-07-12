@@ -399,7 +399,7 @@ const AbsenceManagementPage = () => {
       },
     ];
   }, [isAdmin, user?.id]);
-
+console.log(formData)
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -494,13 +494,12 @@ const AbsenceManagementPage = () => {
                 <div className="flex-1">
                   <Label htmlFor="start_date">Fecha</Label>
                   <DatePicker
-                    locale="es"
                     selected={
                       formData.start_date ? new Date(formData.start_date) : null
                     }
-                    onChange={(date) => handleDateChange("start_date", date)} // Necesitas una función que maneje el objeto Date
+                    onChange={(date) => handleDateChange("start_date", date)}
                     dateFormat="dd/MM/yyyy"
-                    className="w-full bg-background border border-input rounded-md px-3 py-2" // <-- ¡Puedes aplicar tus clases de Tailwind!
+                    className="w-full bg-background border border-input rounded-md px-3 py-2"
                     placeholderText="Selecciona una fecha"
                   />
                 </div>

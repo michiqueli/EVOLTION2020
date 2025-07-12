@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { format } from 'date-fns';
+import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import FileUploadSection from "@/components/activities/FileUploadSection";
 import { useUser } from "@/contexts/UserContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -199,7 +201,7 @@ export const ActivityFormModal = ({
         setSelectedProject(preSelectedProject || null);
         setFormData({
           project_id: preSelectedProject?.uuid_id || null,
-          report_date: format(new Date(), 'yyyy-MM-dd'),
+          report_date: new Date(),
           user_id: user.user_id,
         });
         setFilePreviews([]);
@@ -322,7 +324,13 @@ export const ActivityFormModal = ({
       const existingFiles = filePreviews.filter((p) => p.url);
       const allFiles = [...existingFiles, ...newUploadedFiles];
       const { id, created_at, proyectos, ...dataToSave } = formData;
-      const finalData = { ...dataToSave, imagenes: JSON.stringify(allFiles) };
+      const finalData = {
+        ...dataToSave,
+        imagenes: JSON.stringify(allFiles),
+        report_date: formData.report_date
+          ? format(formData.report_date, "yyyy-MM-dd")
+          : null,
+      };
 
       await onSubmit(finalData, existingActivity?.id);
       onOpenChange(false);
@@ -337,7 +345,7 @@ export const ActivityFormModal = ({
       setIsSubmitting(false);
     }
   };
-console.log(formData)
+
   const handleProjectSelection = (projectId) => {
     const project = projects.find((p) => p.uuid_id === projectId);
     setSelectedProject(project);
@@ -346,7 +354,7 @@ console.log(formData)
       project_id: project ? project.uuid_id : null,
     }));
   };
-
+  
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[625px] bg-background border-border max-h-[90vh] overflow-y-auto">
@@ -359,7 +367,7 @@ console.log(formData)
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+          <div className="space-y-2">
             <Label>Proyecto</Label>
             <Select
               value={selectedProject?.uuid_id || ""}
@@ -380,35 +388,56 @@ console.log(formData)
           </div>
 
           {selectedProject && (
-            <div className="space-y-4 pt-4 border-t">
-              {selectedProject.project_type?.includes("placas_industrial") && (
-                <IndustrialForm data={formData} onChange={handleInputChange} />
-              )}
-              {selectedProject.project_type?.includes("hincado") && (
-                <HincadoForm data={formData} onChange={handleInputChange} />
-              )}
-              {selectedProject.project_type?.includes("seguridad_altura") && (
-                <SeguridadForm data={formData} onChange={handleInputChange} />
-              )}
-
-              <div>
-                <Label>Comentarios / Novedades</Label>
-                <Textarea
-                  name="comentario_libre"
-                  onChange={handleInputChange}
-                  placeholder="Añade cualquier observación relevante del día..."
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="reportDate">Fecha del Informe</Label>
+                <DatePicker
+                  locale="es"
+                  id="reportDate"
+                  selected={formData.report_date || null}
+                  onChange={(date) =>
+                    setFormData((prev) => ({ ...prev, report_date: date }))
+                  }
+                  dateFormat="dd/MM/yyyy"
+                  placeholderText="Selecciona una fecha"
+                  className="w-full bg-background border border-input rounded-md px-3 py-2 text-foreground"
                 />
               </div>
+              <div className="space-y-4 pt-4 border-t">
+                {selectedProject.project_type?.includes(
+                  "placas_industrial"
+                ) && (
+                  <IndustrialForm
+                    data={formData}
+                    onChange={handleInputChange}
+                  />
+                )}
+                {selectedProject.project_type?.includes("hincado") && (
+                  <HincadoForm data={formData} onChange={handleInputChange} />
+                )}
+                {selectedProject.project_type?.includes("seguridad_altura") && (
+                  <SeguridadForm data={formData} onChange={handleInputChange} />
+                )}
 
-              <FileUploadSection
-                filePreviews={filePreviews}
-                setFilePreviews={setFilePreviews}
-                handleFileChange={handleFileChange}
-                removeFile={removeFile}
-                isUploading={isUploading}
-                disabled={isSubmitting}
-              />
-            </div>
+                <div>
+                  <Label>Comentarios / Novedades</Label>
+                  <Textarea
+                    name="comentario_libre"
+                    onChange={handleInputChange}
+                    placeholder="Añade cualquier observación relevante del día..."
+                  />
+                </div>
+
+                <FileUploadSection
+                  filePreviews={filePreviews}
+                  setFilePreviews={setFilePreviews}
+                  handleFileChange={handleFileChange}
+                  removeFile={removeFile}
+                  isUploading={isUploading}
+                  disabled={isSubmitting}
+                />
+              </div>
+            </>
           )}
 
           <DialogFooter>
