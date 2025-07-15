@@ -88,7 +88,7 @@ const RegisterPage = () => {
           options: {
             data: {
               nombre: fullName,
-              rol: "TECNICO",
+              rol: selectedRole,
             },
           },
         });
@@ -96,45 +96,15 @@ const RegisterPage = () => {
       if (signUpError) {
         throw signUpError;
       }
-      console.log(signUpData);
-      if (signUpData.user) {
-        const { error: profileError } = await supabase.from("usuarios").insert([
-          {
-            user_id: signUpData.user.id,
-            nombre: fullName,
-            rol: selectedRole,
-            estado: "Pendiente",
-          },
-        ]);
-
-        if (profileError) {
-          console.error("Error creating user profile:", profileError);
-          await supabase.auth.admin
-            .deleteUser(signUpData.user.id)
-            .catch((delErr) => {
-              console.error("Failed to delete orphaned auth user:", delErr);
-            });
-          throw new Error(
-            `Error al crear el perfil de usuario: ${profileError.message}. Por favor, intenta registrarte de nuevo o contacta a soporte.`
-          );
-        }
-        navigate("/", {
-          state: {
-            message:
-              "¡Registro Exitoso! Tu cuenta está pendiente de aprobación.",
-          },
-        });
-      } else if (signUpData.session === null && !signUpData.user) {
-        setError(
-          "No se pudo completar el registro. El usuario podría ya existir o requerir confirmación de email."
-        );
+      if (signUpData.user && signUpData.session === null) {
         toast({
-          title: "Registro Incompleto",
+          title: "¡Registro casi completo!",
           description:
-            "No se pudo completar el registro. Verifica tu email o intenta más tarde.",
-          variant: "default",
+            "Te hemos enviado un email para verificar tu cuenta. Revísalo para poder iniciar sesión.",
+          variant: "success",
           duration: 7000,
         });
+        navigate("/login");
       } else {
         setError("Respuesta inesperada del servidor de autenticación.");
         toast({

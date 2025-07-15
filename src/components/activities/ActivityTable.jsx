@@ -50,7 +50,7 @@ const ActivityTable = ({
                     {/* Usamos report_date que es la fecha del trabajo */}
                     {new Date(
                       activity.report_date + "T00:00:00"
-                    ).toLocaleDateString("es-ES", {
+                    ).toLocaleDateString('es-ES', {
                       year: "numeric",
                       month: "long",
                       day: "numeric",

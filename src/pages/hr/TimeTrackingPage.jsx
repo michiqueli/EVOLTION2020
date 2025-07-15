@@ -107,7 +107,7 @@ const TimeTrackingPage = () => {
   const fetchProjects = useCallback(async () => {
     const { data, error } = await supabase
       .from("proyectos")
-      .select("id, nombre")
+      .select("id, nombre, uuid_id")
       .order("nombre")
       .eq('estado', 'En Proceso')
     if (error) {
@@ -416,7 +416,7 @@ const TimeTrackingPage = () => {
       const { data: project, error: fetchError } = await supabase
         .from("proyectos")
         .select("horas, nombre")
-        .eq("uuid_id", projectId)
+        .eq("id", projectId)
         .single();
 
       if (fetchError)
@@ -429,7 +429,7 @@ const TimeTrackingPage = () => {
       const { error: updateError } = await supabase
         .from("proyectos")
         .update({ horas: newHours })
-        .eq("uuid_id", projectId);
+        .eq("id", projectId);
 
       if (updateError)
         throw new Error(
@@ -796,7 +796,7 @@ const TimeTrackingPage = () => {
                 value={
                   modalFormData.is_other_project
                     ? "OTRO"
-                    : modalFormData.project_id || 0
+                    : String(modalFormData.project_id || "")
                 }
                 onValueChange={(value) =>
                   handleModalSelectChange("project_id", value)
@@ -810,7 +810,7 @@ const TimeTrackingPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
+                    <SelectItem key={p.id} value={String(p.id)}>
                       {p.nombre}
                     </SelectItem>
                   ))}

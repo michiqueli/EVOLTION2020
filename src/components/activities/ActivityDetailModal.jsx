@@ -13,69 +13,19 @@ import { supabase } from "@/lib/supabaseClient";
 import jsPDF from "jspdf";
 import {
   Users,
-  AlertTriangle,
   Image as ImageIcon,
   FileText,
   Zap,
   ClipboardSignature,
+  ClipboardList,
 } from "lucide-react";
 import { ALL_METRICS_CONFIG } from "@/lib/planningConfig";
+import { add } from "date-fns";
 
 const isImageFile = (fileName) => {
   if (!fileName) return false;
   const validExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
   return validExtensions.some((ext) => fileName.toLowerCase().endsWith(ext));
-};
-
-// Función auxiliar para parsear el texto de comentarios en secciones
-const parseComments = (text) => {
-  if (!text) {
-    return { description: "", incidents: "", requests: "" };
-  }
-
-  let remainingText = text;
-  let incidents = "";
-  let requests = "";
-
-  const incidentKeywords = ["incidencias:", "incidencia:"];
-  const requestKeywords = ["solicitud:", "solicitudes:"];
-
-  // Función para extraer una sección y quitarla del texto principal
-  const extractSection = (keywords, currentText) => {
-    const lowerCaseText = currentText.toLowerCase();
-    for (const keyword of keywords) {
-      const keywordIndex = lowerCaseText.indexOf(keyword);
-      if (keywordIndex !== -1) {
-        const sectionText = currentText
-          .substring(keywordIndex + keyword.length)
-          .trim();
-        const mainText = currentText.substring(0, keywordIndex).trim();
-        return { mainText, sectionText };
-      }
-    }
-    return { mainText: currentText, sectionText: "" };
-  };
-
-  // Extraer incidencias primero
-  const incidentResult = extractSection(incidentKeywords, remainingText);
-  remainingText = incidentResult.mainText;
-  incidents = incidentResult.sectionText;
-
-  // Extraer solicitudes del texto restante (o de las incidencias si estaba anidado)
-  const requestResult = extractSection(
-    requestKeywords,
-    incidents || remainingText
-  );
-  requests = requestResult.sectionText;
-
-  // Limpiar el texto de incidencias si la solicitud estaba dentro
-  if (incidents && requests) {
-    incidents = requestResult.mainText;
-  } else {
-    remainingText = requestResult.mainText;
-  }
-
-  return { description: remainingText, incidents, requests };
 };
 
 // Función para añadir la imagen de fondo a una página del PDF
@@ -161,9 +111,7 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
   }, [activity]);
 
   // Procesamos los datos una sola vez
-  const { description, incidents, requests } = parseComments(
-    activity.comentario_libre
-  );
+  console.log(activity);
   const images = activity.imagenes ? JSON.parse(activity.imagenes) : [];
   const projectName = activity.proyectos?.nombre || "Proyecto no especificado";
   const creatorName = activity.creador?.nombre || "No especificado";
@@ -199,15 +147,19 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
       doc.text(reportDateFormatted, docWidth - margin, y, { align: "right" });
 
       // 3. Incrementamos 'y' para que el título aparezca debajo
-      y += 20;
+      y += 15;
 
       // Título del Proyecto
       doc.setFontSize(18);
       doc.setTextColor(40);
-      doc.text(`INFORME DIARIO: ${projectName}`, docWidth / 2, y, {
+      doc.text(`INFORME DIARIO`, docWidth / 2, y, {
         align: "center",
       });
       y += 10;
+      doc.text(projectName, docWidth / 2, y, {
+        align: "center",
+      });
+      y += 5;
       doc.setDrawColor(200);
       doc.line(margin, y, docWidth - margin, y);
       y += 10;
@@ -238,7 +190,7 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
       const activitiesText = performedActivities.join("\n");
       // Secciones de texto
       await addSection(
-        "1. ACTIVIDADES REALIZADAS",
+        "ACTIVIDADES REALIZADAS",
         activitiesText || "No se reportaron cantidades para este día."
       );
 
@@ -247,33 +199,14 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
           .map((t) => `${t.nombre} (${t.rol || "Técnico"})`)
           .join("\n");
         addSection(
-          "2. PERSONAL INVOLUCRADO",
+          "PERSONAL INVOLUCRADO",
           teamText || "No se registraron fichajes para este día y proyecto."
         );
       }
 
-      addSection(
-        "3. INCIDENCIAS",
-        incidents || "No se registraron incidencias."
-      );
-
-      await addSection("2. COMENTARIOS ADICIONALES", description);
-
-      // Firma
-      addSection(
-        "5. RESPONSABLE",
-        `Nombre: ${creatorName}`
-      );
-
       // Registro Fotográfico
       if (images.length > 0) {
-        doc.addPage();
-        await addBackgroundImage(doc, docWidth, docHeight);
-        y = 60;
-        doc.setFontSize(12);
-        doc.setFont(undefined, "bold");
-        doc.text("4. REGISTRO FOTOGRÁFICO", margin, y);
-        y += 10;
+        addSection("REGISTRO FOTOGRÁFICO", "");
 
         for (const img of images) {
           try {
@@ -349,19 +282,22 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
             y += 10;
           }
         }
+      } else {
+        addSection(
+          "REGISTRO FOTOGRÁFICO",
+          "No se adjuntaron imágenes para este día."
+        );
       }
 
-      // Solicitud de Material
-      if (requests) {
-        doc.addPage();
-        await addBackgroundImage(doc, docWidth, docHeight);
-        y = 20;
-        addSection("SOLICITUD DE MATERIAL Y/O SERVICIO", requests);
-      }
-
-      doc.save(
-        `Informe-${projectName.replace(/ /g, "_")}-${activity.report_date}.pdf`
+      await addSection(
+        "COMENTARIOS ADICIONALES",
+        activity.comentario_libre || "No hay comentarios adicionales."
       );
+
+      // Firma
+      addSection("RESPONSABLE", `Nombre: ${creatorName}`);
+
+      doc.save(`${activity.report_date}-${projectName.replace(/ /g, "_")}.pdf`);
       toast({ title: "PDF Generado", variant: "success" });
     } catch (error) {
       console.error("Error al generar el PDF:", error);
@@ -400,8 +336,8 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
           <div className="space-y-6">
             <section>
               <h3 className="font-bold text-base mb-2 flex items-center gap-2">
-                <Zap className="h-4 w-4 text-primary" /> 1. ACTIVIDADES
-                REALIZADAS
+                <Zap className="h-4 w-4 text-primary" />
+                ACTIVIDADES REALIZADAS
               </h3>
               {performedActivities.length > 0 ? (
                 <ul className="list-disc pl-10 text-muted-foreground">
@@ -418,8 +354,8 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
 
             <section>
               <h3 className="font-bold text-base mb-2 flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" /> 2. PERSONAL
-                INVOLUCRADO
+                <Users className="h-4 w-4 text-primary" />
+                PERSONAL INVOLUCRADO
               </h3>
               {loadingTeam ? (
                 <p className="pl-6 text-muted-foreground italic">
@@ -442,23 +378,11 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
               )}
             </section>
 
-            {incidents && (
-              <section>
-                <h3 className="font-bold text-base mb-2 flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-primary" /> 3.
-                  INCIDENCIAS
-                </h3>
-                <p className="text-muted-foreground pl-6 whitespace-pre-wrap">
-                  {incidents}
-                </p>
-              </section>
-            )}
-
             {images.length > 0 && (
               <section>
                 <h3 className="font-bold text-base mb-2 flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4 text-primary" /> 4. REGISTRO
-                  FOTOGRÁFICO
+                  <ImageIcon className="h-4 w-4 text-primary" />
+                  REGISTRO FOTOGRÁFICO
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pl-6">
                   {images.map((img, index) => (
@@ -493,26 +417,31 @@ const ActivityDetailModal = ({ isOpen, onClose, activity }) => {
                 </div>
               </section>
             )}
+            <section>
+              <h3 className="font-bold text-base mb-2 flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-primary" />
+                COMENTARIOS ADICIONALES
+              </h3>
+              {activity.comentario_libre ? (
+                <p className="pl-6 text-muted-foreground">
+                  {activity.comentario_libre}
+                </p>
+              ) : (
+                <p className="text-muted-foreground pl-6 italic">
+                  No hay comentarios adicionales.
+                </p>
+              )}
+            </section>
 
             <section>
               <h3 className="font-bold text-base mb-2 flex items-center gap-2">
-                <ClipboardSignature className="h-4 w-4 text-primary" /> 5. RESPONSABLE
+                <ClipboardSignature className="h-4 w-4 text-primary" />
+                RESPONSABLE
               </h3>
               <div className="pl-6">
                 <p>Nombre: {creatorName}</p>
               </div>
             </section>
-
-            {requests && (
-              <section className="pt-6 border-t mt-6">
-                <h3 className="font-bold text-base mb-2 text-primary">
-                  SOLICITUD DE MATERIAL Y/O SERVICIO
-                </h3>
-                <p className="text-muted-foreground pl-6 whitespace-pre-wrap">
-                  {requests}
-                </p>
-              </section>
-            )}
           </div>
         </div>
 
