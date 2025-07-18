@@ -356,7 +356,7 @@ const UserManagementPage = () => {
         <div className="flex space-x-2 justify-end">
           {updatingUserId === row.id ? (
             <Loader2 className="h-5 w-5 animate-spin" />
-          ) : row.estado === "pendiente" ? (
+          ) : row.estado === "Pendiente" ? (
             <>
               <Button
                 size="sm"
